@@ -93,6 +93,9 @@ Route::middleware(['auth', 'admin'])->group(function () {
     Route::get('/admin/manage/users', [AdminManageUserController::class, 'index'])->name('admin.manage.users.index');
     Route::post('/admin/manage/users', [AdminManageUserController::class, 'store'])->name('admin.manage.users.store');
     Route::patch('/admin/manage/users/{user}', [AdminManageUserController::class, 'update'])->name('admin.manage.users.update');
+    Route::delete('/admin/manage/users/bulk', [AdminManageUserController::class, 'bulkDestroy'])->name('admin.manage.users.bulk-destroy');
+    Route::delete('/admin/manage/users/{user}', [AdminManageUserController::class, 'destroy'])->name('admin.manage.users.destroy');
+    Route::post('/admin/manage/users/{user}/restore', [AdminManageUserController::class, 'restore'])->name('admin.manage.users.restore');
     Route::post('/admin/manage/users/{user}/password-link', [AdminManageUserController::class, 'resendPasswordLink'])->name('admin.manage.users.password-link');
     Route::get('/admin/manage/users/export', [AdminManageUserController::class, 'export'])->name('admin.manage.users.export');
     Route::post('/admin/manage/users/import', [AdminManageUserController::class, 'import'])->name('admin.manage.users.import');

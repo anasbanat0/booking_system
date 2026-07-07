@@ -81,7 +81,9 @@
                                     class="mt-1 block w-full rounded-md border-slate-300 text-sm shadow-sm focus:border-blue-500 focus:ring-blue-500">
                                 <option value="">All periods</option>
                                 @foreach($periods as $period)
-                                    <option value="{{ $period }}" @selected(request('period') === $period)>{{ $period }}</option>
+                                    <option value="{{ $period->start_time }}" @selected(request('period') === $period->start_time)>
+                                        {{ $period->start_time }} - {{ $period->end_time }}
+                                    </option>
                                 @endforeach
                             </select>
                         </label>

@@ -16,7 +16,7 @@ class AdminUserCalendarController extends Controller
 {
     public function index(Request $request)
     {
-        $view = $request->input('view', 'week');
+        $view = $request->input('view', 'day');
         $date = $request->filled('date') ? Carbon::parse($request->date) : now();
         $startOfWeek = $request->filled('week') ? Carbon::parse($request->week)->startOfWeek() : $date->copy()->startOfWeek();
 

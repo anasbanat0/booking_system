@@ -15,18 +15,16 @@
                     <x-nav-link :href="route('dashboard')" :active="request()->routeIs('dashboard')">
                         {{ __('Dashboard') }}
                     </x-nav-link>
-                    <x-nav-link :href="route('calendar.index')" :active="request()->routeIs('calendar.index')">
-                        {{ __('Calendar') }}
-                    </x-nav-link>
-                    <x-nav-link :href="route('bookings.my')" :active="request()->routeIs('bookings.my')">
-                        {{ __('My Bookings') }}
-                    </x-nav-link>
-                    @if(Auth::user()?->role === 'admin')
-                        <x-nav-link :href="route('admin.dashboard')" :active="request()->routeIs('admin.dashboard')">
-                            {{ __('Admin') }}
+                    @if(Auth::user()?->role === 'student')
+                        <x-nav-link :href="route('calendar.index')" :active="request()->routeIs('calendar.index')">
+                            {{ __('Calendar') }}
                         </x-nav-link>
-                        <x-nav-link :href="route('admin.bookings.index')" :active="request()->routeIs('admin.bookings.*')">
-                            {{ __('Bookings') }}
+                        <x-nav-link :href="route('bookings.my')" :active="request()->routeIs('bookings.my')">
+                            {{ __('My Bookings') }}
+                        </x-nav-link>
+                    @elseif(Auth::user()?->isAdminPanelUser())
+                        <x-nav-link :href="route(Auth::user()->role === 'admin' ? 'admin.dashboard' : 'admin.users-calendar.index')" :active="request()->routeIs('admin.*')">
+                            {{ Auth::user()->role === 'admin' ? __('Admin Panel') : __('Staff Panel') }}
                         </x-nav-link>
                     @endif
                 </div>
@@ -84,18 +82,16 @@
             <x-responsive-nav-link :href="route('dashboard')" :active="request()->routeIs('dashboard')">
                 {{ __('Dashboard') }}
             </x-responsive-nav-link>
-            <x-responsive-nav-link :href="route('calendar.index')" :active="request()->routeIs('calendar.index')">
-                {{ __('Calendar') }}
-            </x-responsive-nav-link>
-            <x-responsive-nav-link :href="route('bookings.my')" :active="request()->routeIs('bookings.my')">
-                {{ __('My Bookings') }}
-            </x-responsive-nav-link>
-            @if(Auth::user()?->role === 'admin')
-                <x-responsive-nav-link :href="route('admin.dashboard')" :active="request()->routeIs('admin.dashboard')">
-                    {{ __('Admin') }}
+            @if(Auth::user()?->role === 'student')
+                <x-responsive-nav-link :href="route('calendar.index')" :active="request()->routeIs('calendar.index')">
+                    {{ __('Calendar') }}
                 </x-responsive-nav-link>
-                <x-responsive-nav-link :href="route('admin.bookings.index')" :active="request()->routeIs('admin.bookings.*')">
-                    {{ __('Bookings') }}
+                <x-responsive-nav-link :href="route('bookings.my')" :active="request()->routeIs('bookings.my')">
+                    {{ __('My Bookings') }}
+                </x-responsive-nav-link>
+            @elseif(Auth::user()?->isAdminPanelUser())
+                <x-responsive-nav-link :href="route(Auth::user()->role === 'admin' ? 'admin.dashboard' : 'admin.users-calendar.index')" :active="request()->routeIs('admin.*')">
+                    {{ Auth::user()->role === 'admin' ? __('Admin Panel') : __('Staff Panel') }}
                 </x-responsive-nav-link>
             @endif
         </div>

@@ -9,13 +9,14 @@ use Illuminate\Database\Eloquent\Attributes\Hidden;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
+use Illuminate\Database\Eloquent\SoftDeletes;
 
-#[Fillable(['name', 'email', 'phone', 'password', 'role', 'booking_location_id', 'booking_warning_count', 'booking_warning_reason', 'booking_warning_at'])]
+#[Fillable(['name', 'email', 'phone', 'password', 'role', 'booking_location_id', 'profile_photo_path', 'booking_warning_count', 'booking_warning_reason', 'booking_warning_at'])]
 #[Hidden(['password', 'remember_token'])]
 class User extends Authenticatable
 {
     /** @use HasFactory<UserFactory> */
-    use HasFactory, Notifiable;
+    use HasFactory, Notifiable, SoftDeletes;
 
     /**
      * Get the attributes that should be cast.

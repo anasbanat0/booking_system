@@ -30,6 +30,12 @@
             'active' => request()->routeIs('admin.slots.*') || request()->routeIs('admin.locations.*') || request()->routeIs('admin.slot-templates.*') || request()->routeIs('admin.booking-rules.*'),
             'icon' => 'M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20Zm1 5h-2v6l5 3 1-1.73-4-2.27V7Z',
         ],
+        [
+            'label' => 'Manage Users',
+            'route' => 'admin.manage.users.index',
+            'active' => request()->routeIs('admin.manage.users.*'),
+            'icon' => 'M16 11c1.66 0 3-1.34 3-3s-1.34-3-3-3 1.34-3 3 1.34 3 3 3ZM8 11c1.66 0 3-1.34 3-3S9.66 5 8 5 5 6.34 5 8s1.34 3 3 3Zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5C15 14.17 10.33 13 8 13Zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5C23 14.17 18.33 13 16 13Z',
+        ],
     ];
 
     if (Auth::user()?->canManageAllBranches()) {
@@ -38,13 +44,6 @@
             'route' => 'admin.content.index',
             'active' => request()->routeIs('admin.content.*'),
             'icon' => 'M4 5a2 2 0 0 1 2-2h9l5 5v11a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V5Zm10 0v4h4l-4-4ZM7 13h10v-2H7v2Zm0 4h7v-2H7v2Z',
-        ];
-
-        $adminLinks[] = [
-            'label' => 'Manage Users',
-            'route' => 'admin.manage.users.index',
-            'active' => request()->routeIs('admin.manage.users.*'),
-            'icon' => 'M16 11c1.66 0 3-1.34 3-3s-1.34-3-3-3 1.34-3 3 1.34 3 3 3ZM8 11c1.66 0 3-1.34 3-3S9.66 5 8 5 5 6.34 5 8s1.34 3 3 3Zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5C15 14.17 10.33 13 8 13Zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5C23 14.17 18.33 13 16 13Z',
         ];
 
         $adminLinks[] = [

@@ -7,6 +7,7 @@ use App\Models\ActivityLog;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Password;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
@@ -14,9 +15,7 @@ class AdminManageUserController extends Controller
 {
     public function index(Request $request)
     {
-        abort_unless($request->user()->canManageAllBranches(), 403);
-
-        $query = User::with('managedLocation')->orderBy('name');
+        $query = $this->scopedUsers($request)->with('managedLocation')->orderBy('name');
 
         if ($request->filled('role')) {
             $query->where('role', $request->role);
@@ -30,32 +29,43 @@ class AdminManageUserController extends Controller
             });
         }
 
+        $trashedUsers = $this->scopedUsers($request)
+            ->onlyTrashed()
+            ->with('managedLocation')
+            ->latest('deleted_at')
+            ->paginate(10, ['*'], 'trash_page')
+            ->withQueryString();
+        $roles = $request->user()->canManageAllBranches() ? ['student', 'staff', 'admin'] : ['student'];
+
         return view('admin.manage.users', [
             'users' => $query->paginate(15)->withQueryString(),
-            'locations' => BookingLocation::orderBy('name')->get(),
-            'roles' => ['student', 'staff', 'admin'],
+            'trashedUsers' => $trashedUsers,
+            'locations' => $request->user()->canManageAllBranches()
+                ? BookingLocation::orderBy('name')->get()
+                : BookingLocation::whereKey($request->user()->booking_location_id)->get(),
+            'roles' => $roles,
         ]);
     }
 
     public function store(Request $request)
     {
-        abort_unless($request->user()->canManageAllBranches(), 403);
-
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:255'],
-            'email' => ['required', 'email', 'max:255', 'unique:users,email'],
-            'phone' => ['nullable', 'string', 'max:40'],
-            'role' => ['required', Rule::in(['student', 'staff', 'admin'])],
+            'email' => ['required', 'email', 'max:255', Rule::unique('users', 'email')->whereNull('deleted_at')],
+            'phone' => ['nullable', 'string', 'max:40', Rule::unique('users', 'phone')->whereNull('deleted_at')],
+            'role' => ['required', Rule::in($request->user()->canManageAllBranches() ? ['student', 'staff', 'admin'] : ['student'])],
             'booking_location_id' => ['nullable', 'exists:booking_locations,id'],
             'password' => ['nullable', 'string', 'min:6'],
         ]);
+
+        $branchId = $this->resolvedBranchId($request, $validated['role'], $validated['booking_location_id'] ?? null);
 
         $user = User::create([
             'name' => $validated['name'],
             'email' => $validated['email'],
             'phone' => $validated['phone'] ?? null,
             'role' => $validated['role'],
-            'booking_location_id' => $validated['role'] === 'staff' ? ($validated['booking_location_id'] ?? null) : null,
+            'booking_location_id' => $branchId,
             'password' => $validated['password'] ?? 'password',
         ]);
 
@@ -70,13 +80,13 @@ class AdminManageUserController extends Controller
 
     public function update(Request $request, User $user)
     {
-        abort_unless($request->user()->canManageAllBranches(), 403);
+        $this->authorizeUserManagement($request, $user);
 
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:255'],
             'email' => ['required', 'email', 'max:255', Rule::unique('users', 'email')->ignore($user->id)],
-            'phone' => ['nullable', 'string', 'max:40'],
-            'role' => ['required', Rule::in(['student', 'staff', 'admin'])],
+            'phone' => ['nullable', 'string', 'max:40', Rule::unique('users', 'phone')->ignore($user->id)],
+            'role' => ['required', Rule::in($request->user()->canManageAllBranches() ? ['student', 'staff', 'admin'] : ['student'])],
             'booking_location_id' => ['nullable', 'exists:booking_locations,id'],
             'password' => ['nullable', 'string', 'min:6'],
         ]);
@@ -86,7 +96,7 @@ class AdminManageUserController extends Controller
             'email' => $validated['email'],
             'phone' => $validated['phone'] ?? null,
             'role' => $validated['role'],
-            'booking_location_id' => $validated['role'] === 'staff' ? ($validated['booking_location_id'] ?? null) : null,
+            'booking_location_id' => $this->resolvedBranchId($request, $validated['role'], $validated['booking_location_id'] ?? null),
         ];
 
         if (!empty($validated['password'])) {
@@ -104,15 +114,13 @@ class AdminManageUserController extends Controller
 
     public function export(): StreamedResponse
     {
-        abort_unless(request()->user()->canManageAllBranches(), 403);
-
         $filename = 'users-' . now()->format('Y-m-d') . '.csv';
 
         return response()->streamDownload(function () {
             $handle = fopen('php://output', 'w');
             fputcsv($handle, ['name', 'email', 'phone', 'role', 'branch', 'password']);
 
-            User::with('managedLocation')->orderBy('name')->chunk(200, function ($users) use ($handle) {
+            $this->scopedUsers(request())->with('managedLocation')->orderBy('name')->chunk(200, function ($users) use ($handle) {
                 foreach ($users as $user) {
                     fputcsv($handle, [
                         $user->name,
@@ -131,7 +139,7 @@ class AdminManageUserController extends Controller
 
     public function resendPasswordLink(User $user)
     {
-        abort_unless(request()->user()->canManageAllBranches(), 403);
+        $this->authorizeUserManagement(request(), $user);
 
         Password::sendResetLink(['email' => $user->email]);
         ActivityLog::record('password_link_sent', 'Password setup link sent', 'A password setup link was sent to ' . $user->email . '.', [
@@ -143,13 +151,12 @@ class AdminManageUserController extends Controller
 
     public function import(Request $request)
     {
-        abort_unless($request->user()->canManageAllBranches(), 403);
-
         $request->validate([
             'file' => ['required', 'file', 'mimes:csv,txt'],
         ]);
 
-        $locations = BookingLocation::pluck('id', 'name');
+        $locations = BookingLocation::pluck('id', 'name')
+            ->mapWithKeys(fn ($id, $name) => [strtolower(trim($name)) => $id]);
         $handle = fopen($request->file('file')->getRealPath(), 'r');
         $header = fgetcsv($handle);
 
@@ -159,26 +166,46 @@ class AdminManageUserController extends Controller
 
         $header = array_map(fn ($value) => strtolower(trim($value)), $header);
         $imported = 0;
+        $skipped = 0;
+        $skippedRows = [];
 
         while (($row = fgetcsv($handle)) !== false) {
             $row = array_slice(array_pad($row, count($header), null), 0, count($header));
             $data = array_combine($header, $row);
-            $role = in_array($data['role'] ?? 'student', ['student', 'staff', 'admin'], true) ? $data['role'] : 'student';
+            $role = in_array($data['role'] ?? 'student', $request->user()->canManageAllBranches() ? ['student', 'staff', 'admin'] : ['student'], true) ? $data['role'] : 'student';
 
             if (empty($data['email']) || empty($data['name'])) {
                 continue;
             }
 
-            $user = User::updateOrCreate(
-                ['email' => trim($data['email'])],
-                [
-                    'name' => trim($data['name']),
-                    'phone' => $data['phone'] ?? null,
-                    'role' => $role,
-                    'booking_location_id' => $role === 'staff' ? ($locations[$data['branch'] ?? ''] ?? null) : null,
-                    'password' => $data['password'] ?? 'password',
-                ]
-            );
+            $email = trim($data['email']);
+            $phone = trim($data['phone'] ?? '');
+            $exists = User::where(function ($query) use ($email, $phone) {
+                $query->where('email', $email);
+
+                if ($phone !== '') {
+                    $query->orWhere('phone', $phone);
+                }
+            })->exists();
+
+            if ($exists) {
+                $skipped++;
+                $skippedRows[] = $email;
+                continue;
+            }
+
+            $branchId = $request->user()->canManageAllBranches()
+                ? ($locations[strtolower(trim($data['branch'] ?? ''))] ?? null)
+                : $request->user()->booking_location_id;
+
+            $user = User::create([
+                'name' => trim($data['name']),
+                'email' => $email,
+                'phone' => $phone !== '' ? $phone : null,
+                'role' => $role,
+                'booking_location_id' => $role === 'admin' ? null : $branchId,
+                'password' => $data['password'] ?? 'password',
+            ]);
 
             Password::sendResetLink(['email' => $user->email]);
             ActivityLog::record('user_imported', 'User imported', $user->name . ' was imported or updated from CSV.', [
@@ -191,6 +218,96 @@ class AdminManageUserController extends Controller
 
         fclose($handle);
 
-        return back()->with('success', $imported . ' users imported successfully.');
+        $message = $imported . ' users imported successfully.';
+
+        if ($skipped > 0) {
+            $message .= ' ' . $skipped . ' duplicate users skipped: ' . implode(', ', array_slice($skippedRows, 0, 5)) . ($skipped > 5 ? '...' : '') . '.';
+        }
+
+        return back()->with($skipped > 0 ? 'warning' : 'success', $message);
+    }
+
+    public function destroy(Request $request, User $user)
+    {
+        $this->authorizeUserManagement($request, $user);
+
+        if ($request->user()->is($user)) {
+            return back()->with('error', 'You cannot delete your own account.');
+        }
+
+        $user->delete();
+        ActivityLog::record('user_deleted', 'User moved to trash', $user->name . ' was moved to trash.', [
+            'user_id' => $user->id,
+        ]);
+
+        return back()->with('success', 'User moved to trash.');
+    }
+
+    public function bulkDestroy(Request $request)
+    {
+        $validated = $request->validate([
+            'user_ids' => ['required', 'array'],
+            'user_ids.*' => ['exists:users,id'],
+        ]);
+
+        $users = $this->scopedUsers($request)
+            ->whereIn('id', $validated['user_ids'])
+            ->whereKeyNot($request->user()->id)
+            ->get();
+
+        foreach ($users as $user) {
+            $user->delete();
+            ActivityLog::record('user_deleted', 'User moved to trash', $user->name . ' was moved to trash.', [
+                'user_id' => $user->id,
+            ]);
+        }
+
+        return back()->with('success', $users->count() . ' users moved to trash.');
+    }
+
+    public function restore(Request $request, int $user)
+    {
+        $trashedUser = $this->scopedUsers($request)->onlyTrashed()->findOrFail($user);
+        $trashedUser->restore();
+
+        ActivityLog::record('user_restored', 'User restored', $trashedUser->name . ' was restored from trash.', [
+            'user_id' => $trashedUser->id,
+        ]);
+
+        return back()->with('success', 'User restored successfully.');
+    }
+
+    private function scopedUsers(Request $request)
+    {
+        return User::query()
+            ->when(!$request->user()->canManageAllBranches(), function ($query) use ($request) {
+                $query->where('role', 'student')
+                    ->where('booking_location_id', $request->user()->booking_location_id);
+            });
+    }
+
+    private function authorizeUserManagement(Request $request, User $user): void
+    {
+        if ($request->user()->canManageAllBranches()) {
+            return;
+        }
+
+        abort_unless(
+            $user->role === 'student' && (int) $user->booking_location_id === (int) $request->user()->booking_location_id,
+            403
+        );
+    }
+
+    private function resolvedBranchId(Request $request, string $role, ?int $branchId): ?int
+    {
+        if ($role === 'admin') {
+            return null;
+        }
+
+        if (!$request->user()->canManageAllBranches()) {
+            return $request->user()->booking_location_id;
+        }
+
+        return $branchId;
     }
 }

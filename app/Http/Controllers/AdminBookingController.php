@@ -68,10 +68,10 @@ class AdminBookingController extends Controller
             ->orderBy('start_time')
             ->get();
         $periods = Slot::query()
-            ->select('start_time')
+            ->select('start_time', 'end_time')
             ->distinct()
             ->orderBy('start_time')
-            ->pluck('start_time');
+            ->get();
 
         return view('admin.bookings.index', compact('bookings', 'statuses', 'statusCounts', 'users', 'slots', 'periods'));
     }
