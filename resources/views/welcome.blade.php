@@ -108,6 +108,21 @@
                         @endguest
                     </div>
 
+                    <div class="mt-5 rounded-lg border border-stone-200 p-5">
+                        <p class="text-sm font-bold uppercase tracking-wide text-stone-500">Team access</p>
+                        <p class="mt-2 text-sm leading-6 text-stone-600">
+                            Staff manage only their assigned branch. Admins manage all branches, users, settings, imports, and exports.
+                        </p>
+                        <div class="mt-4 grid grid-cols-2 gap-2">
+                            <a href="{{ route('staff.login') }}" class="flex items-center justify-center rounded-md border border-stone-300 px-3 py-2 text-sm font-extrabold text-stone-700 hover:bg-stone-100">
+                                Staff login
+                            </a>
+                            <a href="{{ route('admin.login') }}" class="flex items-center justify-center rounded-md border border-stone-300 px-3 py-2 text-sm font-extrabold text-stone-700 hover:bg-stone-100">
+                                Admin login
+                            </a>
+                        </div>
+                    </div>
+
                     <div class="mt-5 rounded-lg bg-stone-100 p-4">
                         <p class="text-sm font-bold text-stone-900">Supporting partners</p>
                         @if($logosImage)

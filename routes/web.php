@@ -50,6 +50,10 @@ Route::get('/dashboard', function () {
         return redirect()->route('admin.dashboard');
     }
 
+    if (auth()->user()?->role === 'staff') {
+        return redirect()->route('admin.users-calendar.index');
+    }
+
     return redirect()->route('calendar.index');
 })->middleware(['auth', 'verified'])->name('dashboard');
 

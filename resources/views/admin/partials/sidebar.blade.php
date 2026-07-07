@@ -55,7 +55,14 @@
                 BS
             </div>
             <p class="mt-4 text-xs font-semibold uppercase tracking-wide text-blue-700">Booking System</p>
-            <h2 class="mt-1 text-xl font-bold text-slate-950">Admin Panel</h2>
+            <h2 class="mt-1 text-xl font-bold text-slate-950">
+                {{ Auth::user()?->role === 'staff' ? 'Staff Panel' : 'Admin Panel' }}
+            </h2>
+            @if(Auth::user()?->role === 'staff')
+                <p class="mt-2 rounded-md bg-blue-50 px-3 py-2 text-xs font-bold text-blue-700">
+                    Branch: {{ Auth::user()?->managedLocation?->name ?? 'Not assigned' }}
+                </p>
+            @endif
         </div>
 
         <nav class="space-y-1">
@@ -76,6 +83,7 @@
         <div class="mt-auto rounded-lg border border-slate-200 bg-slate-50 p-4">
             <p class="text-sm font-semibold text-slate-900">{{ Auth::user()?->name }}</p>
             <p class="mt-1 truncate text-xs text-slate-500">{{ Auth::user()?->email }}</p>
+            <p class="mt-2 text-xs font-bold uppercase tracking-wide text-slate-400">{{ Auth::user()?->role }}</p>
         </div>
     </div>
 </aside>

@@ -16,7 +16,17 @@ class AuthenticatedSessionController extends Controller
      */
     public function create(): View
     {
-        return view('auth.login');
+        return view('auth.login', ['portal' => 'student']);
+    }
+
+    public function createAdmin(): View
+    {
+        return view('auth.login', ['portal' => 'admin']);
+    }
+
+    public function createStaff(): View
+    {
+        return view('auth.login', ['portal' => 'staff']);
     }
 
     /**
@@ -30,6 +40,10 @@ class AuthenticatedSessionController extends Controller
 
         if ($request->user()?->role === 'admin') {
             return redirect()->intended(route('admin.dashboard', absolute: false));
+        }
+
+        if ($request->user()?->role === 'staff') {
+            return redirect()->intended(route('admin.users-calendar.index', absolute: false));
         }
 
         return redirect()->intended(route('calendar.index', absolute: false));
