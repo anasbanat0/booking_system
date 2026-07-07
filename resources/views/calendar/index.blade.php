@@ -12,10 +12,25 @@
                 </p>
             </div>
 
-            <a href="{{ route('bookings.my') }}"
-               class="inline-flex items-center justify-center rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-100">
-                My Bookings
-            </a>
+            <div class="flex flex-col gap-3 sm:flex-row sm:items-center">
+                <div class="rounded-md border border-slate-200 bg-white px-4 py-2 text-sm font-extrabold text-slate-800">
+                    {{ $periodLabel }}
+                </div>
+                <div class="flex gap-2">
+                    <a href="{{ route('calendar.index', ['period' => $previousPeriod]) }}"
+                       class="inline-flex items-center justify-center rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-100">
+                        Previous
+                    </a>
+                    <a href="{{ route('calendar.index', ['period' => $nextPeriod]) }}"
+                       class="inline-flex items-center justify-center rounded-md bg-slate-950 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800">
+                        Next
+                    </a>
+                    <a href="{{ route('bookings.my') }}"
+                       class="inline-flex items-center justify-center rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-100">
+                        My Bookings
+                    </a>
+                </div>
+            </div>
         </div>
 
         @if(session('success'))
@@ -55,11 +70,15 @@
                     <div class="space-y-3 p-3">
                         @if($day['is_off'])
                             <div class="rounded-md bg-rose-50 px-3 py-4 text-center text-sm font-semibold text-rose-700">
-                                Off day
+                                {{ $day['off_reason'] ?? 'Off day' }}
+                            </div>
+                        @elseif($day['is_past'])
+                            <div class="rounded-md bg-slate-100 px-3 py-4 text-center text-sm font-semibold text-slate-400">
+                                Finished
                             </div>
                         @elseif($day['slots']->isEmpty())
-                            <div class="rounded-md bg-slate-50 px-3 py-4 text-center text-sm text-slate-500">
-                                No slots generated
+                            <div class="rounded-md bg-slate-50 px-3 py-4 text-center text-sm font-semibold text-slate-500">
+                                Not generated yet
                             </div>
                         @else
                             @foreach($day['slots'] as $slot)

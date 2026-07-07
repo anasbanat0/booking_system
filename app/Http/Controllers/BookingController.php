@@ -82,6 +82,8 @@ class BookingController extends Controller
                 return back()->with('error', 'Please choose a different slot.');
             }
 
+            $this->validateSlotIsFuture($newSlot);
+            $this->validateSlotBranch($newSlot);
             $this->validateSlotAvailability($newSlot);
             $this->validateDuplicateRules($booking->user_id, $newSlot, $booking->id);
 
@@ -151,7 +153,13 @@ class BookingController extends Controller
         $availableSlots = Slot::with('location')
             ->where('is_active', true)
             ->when($request->user()->booking_location_id, fn ($query) => $query->where('booking_location_id', $request->user()->booking_location_id))
-            ->whereDate('date', '>=', now()->toDateString())
+            ->where(function ($query) {
+                $query->whereDate('date', '>', now()->toDateString())
+                    ->orWhere(function ($todayQuery) {
+                        $todayQuery->whereDate('date', now()->toDateString())
+                            ->whereTime('start_time', '>', now()->format('H:i:s'));
+                    });
+            })
             ->whereColumn('booked_count', '<', 'capacity')
             ->orderBy('date')
             ->orderBy('booking_location_id')
@@ -159,29 +167,33 @@ class BookingController extends Controller
             ->get();
 
         $bookingRules = BookingRule::current();
+        [$weekStart, $weekEnd] = $this->monthWeekRange(now());
+        [$monthStart, $monthEnd] = [now()->copy()->startOfMonth(), now()->copy()->endOfMonth()];
+        $monthlyLimit = $this->effectiveMonthlyLimit($request->user(), $bookingRules);
+
         $weeklyUsed = Booking::where('user_id', $request->user()->id)
             ->whereIn('status', $this->quotaStatuses)
-            ->whereHas('slot', function ($query) {
+            ->whereHas('slot', function ($query) use ($weekStart, $weekEnd) {
                 $query->whereBetween('date', [
-                    now()->startOfWeek()->toDateString(),
-                    now()->endOfWeek()->toDateString(),
+                    $weekStart->toDateString(),
+                    $weekEnd->toDateString(),
                 ]);
             })
             ->count();
         $monthlyUsed = Booking::where('user_id', $request->user()->id)
             ->whereIn('status', $this->quotaStatuses)
-            ->whereHas('slot', function ($query) {
+            ->whereHas('slot', function ($query) use ($monthStart, $monthEnd) {
                 $query->whereBetween('date', [
-                    now()->startOfMonth()->toDateString(),
-                    now()->endOfMonth()->toDateString(),
+                    $monthStart->toDateString(),
+                    $monthEnd->toDateString(),
                 ]);
             })
             ->count();
         $remaining = [
             'weekly' => max($bookingRules->weekly_limit - $weeklyUsed, 0),
-            'monthly' => max($bookingRules->monthly_limit - $monthlyUsed, 0),
+            'monthly' => max($monthlyLimit - $monthlyUsed, 0),
             'weeklyLimit' => $bookingRules->weekly_limit,
-            'monthlyLimit' => $bookingRules->monthly_limit,
+            'monthlyLimit' => $monthlyLimit,
             'rescheduleCutoffHours' => $bookingRules->reschedule_cutoff_hours,
         ];
 
@@ -192,15 +204,33 @@ class BookingController extends Controller
     {
         $user = request()->user();
 
+        $this->validateSlotIsFuture($slot);
+        $this->validateSlotBranch($slot);
+        $this->validateSlotAvailability($slot);
+        $this->validateDuplicateRules($userId, $slot);
+        $this->validateBookingLimits($userId, $slot);
+    }
+
+    private function validateSlotIsFuture(Slot $slot): void
+    {
+        $startsAt = Carbon::parse($slot->date . ' ' . $slot->start_time);
+
+        if ($startsAt->lessThanOrEqualTo(now())) {
+            throw ValidationException::withMessages([
+                'slot' => 'This slot has already passed.',
+            ]);
+        }
+    }
+
+    private function validateSlotBranch(Slot $slot): void
+    {
+        $user = request()->user();
+
         if ($user?->booking_location_id && (int) $slot->booking_location_id !== (int) $user->booking_location_id) {
             throw ValidationException::withMessages([
                 'slot' => 'This slot is not available for your branch.',
             ]);
         }
-
-        $this->validateSlotAvailability($slot);
-        $this->validateDuplicateRules($userId, $slot);
-        $this->validateBookingLimits($userId, $slot);
     }
 
     private function validateSlotAvailability(Slot $slot): void
@@ -222,6 +252,19 @@ class BookingController extends Controller
     {
         $bookingRules = BookingRule::current();
         $slotDate = Carbon::parse($slot->date);
+
+        $usedSlotQuery = Booking::where('user_id', $userId)
+            ->where('slot_id', $slot->id);
+
+        if ($ignoreBookingId) {
+            $usedSlotQuery->whereKeyNot($ignoreBookingId);
+        }
+
+        if ($usedSlotQuery->exists()) {
+            throw ValidationException::withMessages([
+                'slot' => 'You already used this exact slot before. Please choose another time.',
+            ]);
+        }
 
         $sameSlotQuery = Booking::where('user_id', $userId)
             ->where('slot_id', $slot->id)
@@ -280,20 +323,22 @@ class BookingController extends Controller
     {
         $bookingRules = BookingRule::current();
         $slotDate = Carbon::parse($slot->date);
+        [$weekStart, $weekEnd] = $this->monthWeekRange($slotDate);
+        $monthlyLimit = $this->effectiveMonthlyLimit(request()->user(), $bookingRules, $slotDate);
 
         $weeklyCount = Booking::where('user_id', $userId)
             ->whereIn('status', $this->quotaStatuses)
-            ->whereHas('slot', function ($query) use ($slotDate) {
+            ->whereHas('slot', function ($query) use ($weekStart, $weekEnd) {
                 $query->whereBetween('date', [
-                    $slotDate->copy()->startOfWeek()->toDateString(),
-                    $slotDate->copy()->endOfWeek()->toDateString(),
+                    $weekStart->toDateString(),
+                    $weekEnd->toDateString(),
                 ]);
             })
             ->count();
 
         if ($weeklyCount >= $bookingRules->weekly_limit) {
             throw ValidationException::withMessages([
-                'limit' => 'Weekly limit reached (' . $bookingRules->weekly_limit . ' bookings).',
+                'limit' => 'Weekly limit reached for this month period (' . $bookingRules->weekly_limit . ' bookings).',
             ]);
         }
 
@@ -307,11 +352,52 @@ class BookingController extends Controller
             })
             ->count();
 
-        if ($monthlyCount >= $bookingRules->monthly_limit) {
+        if ($monthlyCount >= $monthlyLimit) {
             throw ValidationException::withMessages([
-                'limit' => 'Monthly limit reached (' . $bookingRules->monthly_limit . ' bookings).',
+                'limit' => 'Monthly limit reached (' . $monthlyLimit . ' bookings).',
             ]);
         }
+    }
+
+    private function monthWeekRange(Carbon $date): array
+    {
+        $day = $date->day;
+        $startDay = match (true) {
+            $day <= 7 => 1,
+            $day <= 14 => 8,
+            $day <= 21 => 15,
+            default => 22,
+        };
+        $endDay = match ($startDay) {
+            1 => 7,
+            8 => 14,
+            15 => 21,
+            default => $date->copy()->endOfMonth()->day,
+        };
+
+        return [
+            $date->copy()->startOfMonth()->day($startDay)->startOfDay(),
+            $date->copy()->startOfMonth()->day($endDay)->endOfDay(),
+        ];
+    }
+
+    private function effectiveMonthlyLimit($user, BookingRule $bookingRules, ?Carbon $targetDate = null): int
+    {
+        $targetDate ??= now();
+        $createdAt = Carbon::parse($user->created_at);
+
+        if (!$createdAt->isSameMonth($targetDate)) {
+            return $bookingRules->monthly_limit;
+        }
+
+        $bucketIndex = match (true) {
+            $createdAt->day <= 7 => 0,
+            $createdAt->day <= 14 => 1,
+            $createdAt->day <= 21 => 2,
+            default => 3,
+        };
+
+        return min($bookingRules->monthly_limit, max(0, 4 - $bucketIndex) * $bookingRules->weekly_limit);
     }
 
     private function refreshUserWarning($user): void
