@@ -3,7 +3,7 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Sameer Foundation Booking</title>
+    <title>Medical Hub - Samir Foundation</title>
     <link rel="preconnect" href="https://fonts.bunny.net">
     <link href="https://fonts.bunny.net/css?family=figtree:400,500,600,700,800&display=swap" rel="stylesheet" />
     @vite(['resources/css/app.css', 'resources/js/app.js'])
@@ -22,20 +22,16 @@
 
             <div class="relative mx-auto grid max-w-7xl gap-10 px-4 py-8 sm:px-6 lg:grid-cols-[1fr_420px] lg:px-8 lg:py-12">
                 <div class="flex min-h-[620px] flex-col justify-between">
-                    <div class="flex items-center justify-between">
-                        <div class="flex items-center gap-3">
-                            <div class="flex h-12 w-12 items-center justify-center rounded-lg bg-white text-sm font-extrabold text-stone-950">
-                                SF
+                    <div class="flex flex-col items-start gap-5 sm:flex-row sm:items-center sm:justify-between">
+                        <div class="flex flex-col gap-5 sm:flex-row sm:items-center">
+                            <div class="flex h-12 w-auto max-w-80 items-center justify-center rounded-2xl border border-white/70 bg-white p-5 shadow-2xl shadow-black/25 sm:h-32 sm:w-80">
+                                <img src="{{ Vite::asset('resources/images/logo.png') }}" alt="Samir Foundation" class="max-h-14 w-auto object-contain">
                             </div>
                             <div>
-                                <p class="text-base font-bold">Sameer Foundation</p>
-                                <p class="text-xs text-white/60">Student weekly booking system</p>
+                                <p class="text-3xl font-extrabold">Samir Foundation</p>
+                                <p class="text-base text-white/60">Medical Hub</p>
                             </div>
                         </div>
-
-                        <a href="{{ route('instructions') }}" class="hidden rounded-full border border-white/20 px-4 py-2 text-sm font-semibold text-white/80 hover:bg-white/10 sm:inline-flex">
-                            Instructions
-                        </a>
                     </div>
 
                     <div class="max-w-3xl py-12">
@@ -57,10 +53,6 @@
                                     Login to book
                                 </a>
                             @endauth
-
-                            <a href="{{ route('instructions') }}" class="inline-flex items-center justify-center rounded-full border border-white/25 px-6 py-3 text-sm font-bold text-white hover:bg-white/10">
-                                How it works
-                            </a>
                         </div>
                     </div>
 

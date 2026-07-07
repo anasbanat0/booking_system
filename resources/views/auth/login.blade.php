@@ -6,30 +6,25 @@
             'title' => 'Book your weekly appointment',
             'copy' => 'Sign in to view the weekly calendar, reserve a seat, and manage your bookings.',
             'accent' => 'text-teal-700',
-            'badge' => 'SF',
         ],
         'staff' => [
             'label' => 'Staff Portal',
             'title' => 'Manage your branch calendar',
             'copy' => 'Staff members can manage bookings, statuses, closed days, and notifications for their assigned branch.',
             'accent' => 'text-blue-700',
-            'badge' => 'ST',
         ],
         'admin' => [
             'label' => 'Admin Portal',
             'title' => 'Control all branches',
             'copy' => 'Admins can manage branches, staff, students, booking rules, imports, exports, and full calendar operations.',
             'accent' => 'text-slate-800',
-            'badge' => 'AD',
         ],
     ][$portal] ?? null;
 @endphp
 
 <x-guest-layout>
     <div class="mb-6 text-center">
-        <div class="mx-auto flex h-14 w-14 items-center justify-center rounded-lg bg-slate-950 text-sm font-extrabold text-white">
-            {{ $portalConfig['badge'] }}
-        </div>
+
         <p class="mt-4 text-sm font-extrabold uppercase tracking-wide {{ $portalConfig['accent'] }}">
             {{ $portalConfig['label'] }}
         </p>

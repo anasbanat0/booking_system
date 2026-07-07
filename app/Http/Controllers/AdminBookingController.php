@@ -57,7 +57,12 @@ class AdminBookingController extends Controller
             })
             ->groupBy('status')
             ->pluck('total', 'status');
-        $users = User::where('role', 'student')->orderBy('name')->get();
+        $users = User::where('role', 'student')
+            ->when(!$request->user()->canManageAllBranches(), function ($userQuery) use ($request) {
+                $userQuery->where('booking_location_id', $request->user()->booking_location_id);
+            })
+            ->orderBy('name')
+            ->get();
         $slots = Slot::with('location')
             ->where('is_active', true)
             ->whereDate('date', '>=', now()->toDateString())
@@ -70,6 +75,9 @@ class AdminBookingController extends Controller
         $periods = Slot::query()
             ->select('start_time', 'end_time')
             ->distinct()
+            ->when(!$request->user()->canManageAllBranches(), function ($slotQuery) use ($request) {
+                $slotQuery->where('booking_location_id', $request->user()->booking_location_id);
+            })
             ->orderBy('start_time')
             ->get();
 

@@ -44,8 +44,6 @@ Route::get('/', function () {
     ]);
 });
 
-Route::view('/instructions', 'instructions')->name('instructions');
-
 Route::get('/dashboard', function () {
     if (auth()->user()?->role === 'admin') {
         return redirect()->route('admin.dashboard');
@@ -65,6 +63,12 @@ Route::middleware('auth')->group(function () {
 
     Route::middleware('student')->group(function () {
         Route::get('/calendar', [CalendarController::class, 'index'])->name('calendar.index');
+        Route::get('/instructions', function () {
+            return view('instructions', [
+                'instructionsEn' => SiteContent::getValue('instructions_en', '<p>Read the booking rules carefully before choosing a weekly slot. The system checks limits, capacity, and rescheduling rules automatically.</p>'),
+                'instructionsAr' => SiteContent::getValue('instructions_ar', '<p>اقرأ تعليمات الحجز قبل اختيار الموعد. يقوم النظام بفحص الحدود والسعة وقواعد إعادة الجدولة تلقائيا.</p>'),
+            ]);
+        })->name('instructions');
         Route::post('/book-slot', [BookingController::class, 'store'])->name('book.slot');
         Route::get('/my-bookings', [BookingController::class, 'myBookings'])->name('bookings.my');
         Route::post('/booking/{booking}/cancel', [BookingController::class, 'cancel'])->name('bookings.cancel');
@@ -115,8 +119,14 @@ Route::middleware(['auth', 'admin'])->group(function () {
         ->name('admin.slot-templates.store');
     Route::patch('/admin/slot-templates/{template}', [AdminSlotSettingsController::class, 'updateTemplate'])
         ->name('admin.slot-templates.update');
+    Route::delete('/admin/slot-templates/{template}', [AdminSlotSettingsController::class, 'destroyTemplate'])
+        ->name('admin.slot-templates.destroy');
     Route::post('/admin/holidays', [AdminSlotSettingsController::class, 'storeHoliday'])
         ->name('admin.holidays.store');
+    Route::patch('/admin/holidays/{holiday}', [AdminSlotSettingsController::class, 'updateHoliday'])
+        ->name('admin.holidays.update');
+    Route::delete('/admin/holidays/{holiday}', [AdminSlotSettingsController::class, 'destroyHoliday'])
+        ->name('admin.holidays.destroy');
 
     Route::get('/admin/content', [AdminSiteContentController::class, 'index'])->name('admin.content.index');
     Route::patch('/admin/content', [AdminSiteContentController::class, 'update'])->name('admin.content.update');

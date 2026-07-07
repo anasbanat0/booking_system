@@ -168,6 +168,7 @@ class AdminManageUserController extends Controller
         $imported = 0;
         $skipped = 0;
         $skippedRows = [];
+        $outsideBranchDuplicates = 0;
 
         while (($row = fgetcsv($handle)) !== false) {
             $row = array_slice(array_pad($row, count($header), null), 0, count($header));
@@ -180,17 +181,25 @@ class AdminManageUserController extends Controller
 
             $email = trim($data['email']);
             $phone = trim($data['phone'] ?? '');
-            $exists = User::where(function ($query) use ($email, $phone) {
+            $existingUser = User::withTrashed()->where(function ($query) use ($email, $phone) {
                 $query->where('email', $email);
 
                 if ($phone !== '') {
                     $query->orWhere('phone', $phone);
                 }
-            })->exists();
+            })->first();
 
-            if ($exists) {
+            if ($existingUser) {
                 $skipped++;
                 $skippedRows[] = $email;
+
+                if (
+                    !$request->user()->canManageAllBranches()
+                    && (int) $existingUser->booking_location_id !== (int) $request->user()->booking_location_id
+                ) {
+                    $outsideBranchDuplicates++;
+                }
+
                 continue;
             }
 
@@ -222,6 +231,10 @@ class AdminManageUserController extends Controller
 
         if ($skipped > 0) {
             $message .= ' ' . $skipped . ' duplicate users skipped: ' . implode(', ', array_slice($skippedRows, 0, 5)) . ($skipped > 5 ? '...' : '') . '.';
+        }
+
+        if ($outsideBranchDuplicates > 0) {
+            $message .= ' ' . $outsideBranchDuplicates . ' student(s) already exist in another branch. To add or move them into your branch, please contact the main admin.';
         }
 
         return back()->with($skipped > 0 ? 'warning' : 'success', $message);

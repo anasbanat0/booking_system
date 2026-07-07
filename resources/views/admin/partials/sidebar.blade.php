@@ -58,8 +58,20 @@
 <aside class="hidden w-72 shrink-0 border-r border-slate-200 bg-white lg:block">
     <div class="sticky top-0 flex h-screen flex-col px-5 py-6">
         <div class="mb-8">
-            <div class="flex h-11 w-11 items-center justify-center rounded-lg bg-slate-950 text-sm font-bold text-white">
-                BS
+            <div class="flex items-center gap-3">
+                @if(Auth::user()?->profile_photo_path)
+                    <img src="{{ asset('storage/' . Auth::user()->profile_photo_path) }}"
+                         alt="{{ Auth::user()?->name }}"
+                         class="h-14 w-14 rounded-full border-4 border-white object-cover shadow-lg shadow-slate-200 ring-1 ring-slate-200">
+                @else
+                    <div class="flex h-14 w-14 items-center justify-center rounded-full bg-gradient-to-br from-slate-950 via-blue-900 to-teal-700 text-lg font-extrabold text-white shadow-lg shadow-slate-200 ring-1 ring-slate-200">
+                        {{ strtoupper(mb_substr(Auth::user()?->name ?? 'U', 0, 1)) }}
+                    </div>
+                @endif
+                <div class="min-w-0">
+                    <p class="truncate text-sm font-extrabold text-slate-950">{{ Auth::user()?->name }}</p>
+                    <p class="truncate text-xs font-semibold text-slate-500">{{ Auth::user()?->email }}</p>
+                </div>
             </div>
             <p class="mt-4 text-xs font-semibold uppercase tracking-wide text-blue-700">Booking System</p>
             <h2 class="mt-1 text-xl font-bold text-slate-950">
@@ -88,8 +100,21 @@
         </nav>
 
         <div class="mt-auto rounded-lg border border-slate-200 bg-slate-50 p-4">
-            <p class="text-sm font-semibold text-slate-900">{{ Auth::user()?->name }}</p>
-            <p class="mt-1 truncate text-xs text-slate-500">{{ Auth::user()?->email }}</p>
+            <div class="flex items-center gap-3">
+                @if(Auth::user()?->profile_photo_path)
+                    <img src="{{ asset('storage/' . Auth::user()->profile_photo_path) }}"
+                         alt="{{ Auth::user()?->name }}"
+                         class="h-10 w-10 rounded-full object-cover ring-1 ring-slate-200">
+                @else
+                    <div class="flex h-10 w-10 items-center justify-center rounded-full bg-white text-sm font-extrabold text-slate-700 ring-1 ring-slate-200">
+                        {{ strtoupper(mb_substr(Auth::user()?->name ?? 'U', 0, 1)) }}
+                    </div>
+                @endif
+                <div class="min-w-0">
+                    <p class="truncate text-sm font-semibold text-slate-900">{{ Auth::user()?->name }}</p>
+                    <p class="mt-0.5 truncate text-xs text-slate-500">{{ Auth::user()?->email }}</p>
+                </div>
+            </div>
             <p class="mt-2 text-xs font-bold uppercase tracking-wide text-slate-400">{{ Auth::user()?->role }}</p>
         </div>
     </div>
@@ -101,9 +126,15 @@
             <p class="text-xs font-semibold uppercase tracking-wide text-blue-700">Booking System</p>
             <p class="text-base font-bold text-slate-950">Admin Panel</p>
         </div>
-        <div class="flex h-10 w-10 items-center justify-center rounded-lg bg-slate-950 text-xs font-bold text-white">
-            BS
-        </div>
+        @if(Auth::user()?->profile_photo_path)
+            <img src="{{ asset('storage/' . Auth::user()->profile_photo_path) }}"
+                 alt="{{ Auth::user()?->name }}"
+                 class="h-11 w-11 rounded-full object-cover ring-1 ring-slate-200">
+        @else
+            <div class="flex h-11 w-11 items-center justify-center rounded-full bg-gradient-to-br from-slate-950 via-blue-900 to-teal-700 text-sm font-extrabold text-white">
+                {{ strtoupper(mb_substr(Auth::user()?->name ?? 'U', 0, 1)) }}
+            </div>
+        @endif
     </div>
 
     <nav class="grid grid-cols-2 gap-2">

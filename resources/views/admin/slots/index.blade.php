@@ -38,6 +38,7 @@
                 </div>
             @endif
 
+            @if(Auth::user()?->canManageAllBranches())
             <section class="mb-6 rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
                 <div class="mb-5">
                     <h2 class="text-lg font-bold text-slate-950">Booking Rules</h2>
@@ -95,6 +96,7 @@
                     </div>
                 </form>
             </section>
+            @endif
 
             <section class="mb-6 rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
                 <div class="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
@@ -173,11 +175,49 @@
                         <div class="border-b border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold text-slate-700">Upcoming closed days</div>
                         <div class="divide-y divide-slate-100">
                             @forelse($holidays as $holiday)
-                                <div class="flex items-center justify-between gap-3 px-4 py-3">
-                                    <div>
-                                        <p class="text-sm font-bold text-slate-950">{{ $holiday->date }}</p>
-                                        <p class="text-xs text-slate-500">{{ $holiday->location?->name ?? 'All branches' }} | {{ $holiday->reason ?? 'Closed' }}</p>
-                                    </div>
+                                <div class="px-4 py-3">
+                                    <form method="POST" action="{{ route('admin.holidays.update', $holiday) }}" class="grid gap-3 lg:grid-cols-[150px_180px_minmax(0,1fr)_auto_auto] lg:items-end">
+                                        @csrf
+                                        @method('PATCH')
+
+                                        <label class="block">
+                                            <span class="text-xs font-bold uppercase text-slate-500">Date</span>
+                                            <input type="date" name="date" value="{{ $holiday->date }}"
+                                                   class="mt-1 block w-full rounded-md border-slate-300 text-sm shadow-sm focus:border-blue-500 focus:ring-blue-500">
+                                        </label>
+
+                                        <label class="block">
+                                            <span class="text-xs font-bold uppercase text-slate-500">Branch</span>
+                                            @if(Auth::user()?->canManageAllBranches())
+                                                <select name="booking_location_id" class="mt-1 block w-full rounded-md border-slate-300 text-sm shadow-sm focus:border-blue-500 focus:ring-blue-500">
+                                                    <option value="">All branches</option>
+                                                    @foreach($allLocations as $location)
+                                                        <option value="{{ $location->id }}" @selected($holiday->booking_location_id === $location->id)>{{ $location->name }}</option>
+                                                    @endforeach
+                                                </select>
+                                            @else
+                                                <input value="{{ $holiday->location?->name ?? 'Branch' }}" disabled class="mt-1 block w-full rounded-md border-slate-200 bg-slate-100 text-sm text-slate-500">
+                                            @endif
+                                        </label>
+
+                                        <label class="block">
+                                            <span class="text-xs font-bold uppercase text-slate-500">Reason</span>
+                                            <input name="reason" value="{{ $holiday->reason }}"
+                                                   class="mt-1 block w-full rounded-md border-slate-300 text-sm shadow-sm focus:border-blue-500 focus:ring-blue-500">
+                                        </label>
+
+                                        <button class="rounded-md border border-slate-300 px-3 py-2 text-sm font-bold text-slate-700 hover:bg-slate-100">
+                                            Save
+                                        </button>
+                                    </form>
+
+                                    <form method="POST" action="{{ route('admin.holidays.destroy', $holiday) }}" class="mt-2 text-right" onsubmit="return confirm('Delete this closed day?');">
+                                        @csrf
+                                        @method('DELETE')
+                                        <button class="rounded-md border border-rose-200 px-3 py-2 text-sm font-bold text-rose-700 hover:bg-rose-50">
+                                            Delete
+                                        </button>
+                                    </form>
                                 </div>
                             @empty
                                 <div class="px-4 py-8 text-center text-sm text-slate-500">No closed days yet.</div>
@@ -271,6 +311,11 @@
                                                         <button class="rounded-md border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-100">
                                                             Save
                                                         </button>
+                                                        <button type="submit"
+                                                                form="delete-template-{{ $template->id }}"
+                                                                class="mt-2 rounded-md border border-rose-200 px-3 py-2 text-sm font-semibold text-rose-700 hover:bg-rose-50">
+                                                            Delete
+                                                        </button>
                                                     </td>
                                                 </form>
                                             </tr>
@@ -278,6 +323,13 @@
                                     </tbody>
                                 </table>
                             </div>
+
+                            @foreach($location->slotTemplates as $template)
+                                <form id="delete-template-{{ $template->id }}" method="POST" action="{{ route('admin.slot-templates.destroy', $template) }}" onsubmit="return confirm('Delete this slot time?');">
+                                    @csrf
+                                    @method('DELETE')
+                                </form>
+                            @endforeach
 
                             <form method="POST" action="{{ route('admin.slot-templates.store') }}" class="rounded-lg border border-dashed border-slate-300 bg-slate-50 p-4">
                                 @csrf

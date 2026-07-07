@@ -5,12 +5,14 @@ namespace App\Http\Controllers;
 use App\Models\Slot;
 use App\Models\Holiday;
 use Carbon\Carbon;
+use Illuminate\Http\Request;
 
 class CalendarController extends Controller
 {
-    public function index()
+    public function index(Request $request)
     {
         $startOfWeek = Carbon::now()->startOfWeek();
+        $studentLocationId = $request->user()->booking_location_id;
 
         $weekDays = [];
 
@@ -21,7 +23,10 @@ class CalendarController extends Controller
             $isFriday = $date->isFriday();
 
             $isHoliday = Holiday::where('date', $date->toDateString())
-                ->whereNull('booking_location_id')
+                ->where(function ($query) use ($studentLocationId) {
+                    $query->whereNull('booking_location_id')
+                        ->orWhere('booking_location_id', $studentLocationId);
+                })
                 ->exists();
 
             $slots = [];
@@ -30,17 +35,10 @@ class CalendarController extends Controller
                 $slots = Slot::with('location')
                     ->where('date', $date->toDateString())
                     ->where('is_active', true)
+                    ->when($studentLocationId, fn ($query) => $query->where('booking_location_id', $studentLocationId))
                     ->orderBy('booking_location_id')
                     ->orderBy('start_time')
                     ->get();
-
-                $closedLocationIds = Holiday::where('date', $date->toDateString())
-                    ->whereNotNull('booking_location_id')
-                    ->pluck('booking_location_id');
-
-                if ($closedLocationIds->isNotEmpty()) {
-                    $slots = $slots->whereNotIn('booking_location_id', $closedLocationIds)->values();
-                }
             }
 
             $weekDays[] = [

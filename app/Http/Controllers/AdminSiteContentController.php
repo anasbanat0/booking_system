@@ -27,6 +27,8 @@ class AdminSiteContentController extends Controller
             'content' => ['required', 'array'],
             'content.project_intro' => ['required', 'string'],
             'content.usage_instructions' => ['required', 'string'],
+            'content.instructions_en' => ['nullable', 'string'],
+            'content.instructions_ar' => ['nullable', 'string'],
             'content.contact_info' => ['required', 'string'],
             'content.supporters' => ['nullable', 'string'],
             'content.social_links' => ['nullable', 'string'],

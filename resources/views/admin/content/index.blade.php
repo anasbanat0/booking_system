@@ -27,7 +27,7 @@
                 </div>
             @endif
 
-            <form method="POST" action="{{ route('admin.content.update') }}" class="space-y-5 rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+            <form id="content-editor-form" method="POST" action="{{ route('admin.content.update') }}" class="space-y-5 rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
                 @csrf
                 @method('PATCH')
 
@@ -42,6 +42,28 @@
                     <textarea name="content[usage_instructions]" rows="6"
                               class="mt-1 block w-full rounded-md border-slate-300 text-sm shadow-sm focus:border-blue-500 focus:ring-blue-500">{{ old('content.usage_instructions', $contents['usage_instructions']->value ?? '') }}</textarea>
                 </label>
+
+                <div class="grid gap-5 lg:grid-cols-2">
+                    <label class="block">
+                        <span class="text-sm font-semibold text-slate-700">Student instructions - English</span>
+                        <input type="hidden" name="content[instructions_en]" value="{{ old('content.instructions_en', $contents['instructions_en']->value ?? '') }}" data-editor-input="instructions-en">
+                        <div class="mt-2 flex gap-2 rounded-t-md border border-b-0 border-slate-300 bg-slate-50 p-2">
+                            <button type="button" data-editor-command="bold" data-editor-target="instructions-en" class="rounded border border-slate-300 px-2 py-1 text-xs font-bold">B</button>
+                            <button type="button" data-editor-command="insertUnorderedList" data-editor-target="instructions-en" class="rounded border border-slate-300 px-2 py-1 text-xs font-bold">List</button>
+                        </div>
+                        <div id="instructions-en" contenteditable="true" class="min-h-48 rounded-b-md border border-slate-300 bg-white p-3 text-sm leading-6 focus:outline-none focus:ring-2 focus:ring-blue-500">{!! old('content.instructions_en', $contents['instructions_en']->value ?? '<p>Read the booking rules carefully before choosing a weekly slot.</p>') !!}</div>
+                    </label>
+
+                    <label class="block">
+                        <span class="text-sm font-semibold text-slate-700">Student instructions - Arabic</span>
+                        <input type="hidden" name="content[instructions_ar]" value="{{ old('content.instructions_ar', $contents['instructions_ar']->value ?? '') }}" data-editor-input="instructions-ar">
+                        <div class="mt-2 flex gap-2 rounded-t-md border border-b-0 border-slate-300 bg-slate-50 p-2">
+                            <button type="button" data-editor-command="bold" data-editor-target="instructions-ar" class="rounded border border-slate-300 px-2 py-1 text-xs font-bold">B</button>
+                            <button type="button" data-editor-command="insertUnorderedList" data-editor-target="instructions-ar" class="rounded border border-slate-300 px-2 py-1 text-xs font-bold">List</button>
+                        </div>
+                        <div id="instructions-ar" contenteditable="true" dir="rtl" class="min-h-48 rounded-b-md border border-slate-300 bg-white p-3 text-right text-sm leading-6 focus:outline-none focus:ring-2 focus:ring-blue-500">{!! old('content.instructions_ar', $contents['instructions_ar']->value ?? '<p>اقرأ تعليمات الحجز قبل اختيار الموعد.</p>') !!}</div>
+                    </label>
+                </div>
 
                 <label class="block">
                     <span class="text-sm font-semibold text-slate-700">Supporters</span>
@@ -70,4 +92,21 @@
         </div>
     </main>
 </div>
+
+<script>
+document.querySelectorAll('[data-editor-command]').forEach(button => {
+    button.addEventListener('click', () => {
+        const editor = document.getElementById(button.dataset.editorTarget);
+        editor.focus();
+        document.execCommand(button.dataset.editorCommand, false, null);
+    });
+});
+
+document.getElementById('content-editor-form')?.addEventListener('submit', () => {
+    document.querySelectorAll('[data-editor-input]').forEach(input => {
+        const editor = document.getElementById(input.dataset.editorInput);
+        input.value = editor?.innerHTML || '';
+    });
+});
+</script>
 @endsection

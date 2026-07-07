@@ -16,6 +16,7 @@ use Illuminate\Validation\ValidationException;
 class BookingController extends Controller
 {
     private array $activeStatuses = ['booked', 'rescheduled'];
+    private array $quotaStatuses = ['booked', 'rescheduled', 'completed'];
 
     public function store(Request $request)
     {
@@ -62,6 +63,10 @@ class BookingController extends Controller
 
             if (!in_array($booking->status, $this->activeStatuses, true)) {
                 return back()->with('error', 'This booking cannot be rescheduled.');
+            }
+
+            if (!$booking->slot) {
+                return back()->with('error', 'This booking is linked to an unavailable slot. Please contact support.');
             }
 
             $currentSlotDateTime = Carbon::parse($booking->slot->date . ' ' . $booking->slot->start_time);
@@ -124,8 +129,9 @@ class BookingController extends Controller
             }
 
             $this->refreshUserWarning($booking->user);
-            $this->notifyAdmins($booking, 'booking_cancelled', 'Booking cancelled', $booking->user->name . ' cancelled a booking on ' . $booking->slot->date . '.');
-            $this->emailUser($booking, 'Booking cancelled', 'Your booking on ' . $booking->slot->date . ' has been cancelled.');
+            $bookingDate = $booking->slot?->date ?? 'an unavailable slot';
+            $this->notifyAdmins($booking, 'booking_cancelled', 'Booking cancelled', $booking->user->name . ' cancelled a booking on ' . $bookingDate . '.');
+            $this->emailUser($booking, 'Booking cancelled', 'Your booking on ' . $bookingDate . ' has been cancelled.');
             ActivityLog::record('booking_cancelled', 'Booking cancelled', $booking->user->name . ' cancelled a booking.', [
                 'user_id' => $booking->user_id,
                 'booking_id' => $booking->id,
@@ -144,6 +150,7 @@ class BookingController extends Controller
 
         $availableSlots = Slot::with('location')
             ->where('is_active', true)
+            ->when($request->user()->booking_location_id, fn ($query) => $query->where('booking_location_id', $request->user()->booking_location_id))
             ->whereDate('date', '>=', now()->toDateString())
             ->whereColumn('booked_count', '<', 'capacity')
             ->orderBy('date')
@@ -153,7 +160,7 @@ class BookingController extends Controller
 
         $bookingRules = BookingRule::current();
         $weeklyUsed = Booking::where('user_id', $request->user()->id)
-            ->whereIn('status', $this->activeStatuses)
+            ->whereIn('status', $this->quotaStatuses)
             ->whereHas('slot', function ($query) {
                 $query->whereBetween('date', [
                     now()->startOfWeek()->toDateString(),
@@ -162,7 +169,7 @@ class BookingController extends Controller
             })
             ->count();
         $monthlyUsed = Booking::where('user_id', $request->user()->id)
-            ->whereIn('status', $this->activeStatuses)
+            ->whereIn('status', $this->quotaStatuses)
             ->whereHas('slot', function ($query) {
                 $query->whereBetween('date', [
                     now()->startOfMonth()->toDateString(),
@@ -183,6 +190,14 @@ class BookingController extends Controller
 
     private function validateNewBooking(int $userId, Slot $slot): void
     {
+        $user = request()->user();
+
+        if ($user?->booking_location_id && (int) $slot->booking_location_id !== (int) $user->booking_location_id) {
+            throw ValidationException::withMessages([
+                'slot' => 'This slot is not available for your branch.',
+            ]);
+        }
+
         $this->validateSlotAvailability($slot);
         $this->validateDuplicateRules($userId, $slot);
         $this->validateBookingLimits($userId, $slot);
@@ -267,7 +282,7 @@ class BookingController extends Controller
         $slotDate = Carbon::parse($slot->date);
 
         $weeklyCount = Booking::where('user_id', $userId)
-            ->whereIn('status', $this->activeStatuses)
+            ->whereIn('status', $this->quotaStatuses)
             ->whereHas('slot', function ($query) use ($slotDate) {
                 $query->whereBetween('date', [
                     $slotDate->copy()->startOfWeek()->toDateString(),
@@ -283,7 +298,7 @@ class BookingController extends Controller
         }
 
         $monthlyCount = Booking::where('user_id', $userId)
-            ->whereIn('status', $this->activeStatuses)
+            ->whereIn('status', $this->quotaStatuses)
             ->whereHas('slot', function ($query) use ($slotDate) {
                 $query->whereBetween('date', [
                     $slotDate->copy()->startOfMonth()->toDateString(),

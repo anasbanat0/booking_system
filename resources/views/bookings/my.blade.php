@@ -104,6 +104,7 @@
                             $slotDateTime = $booking->slot ? \Carbon\Carbon::parse($booking->slot->date . ' ' . $booking->slot->start_time) : null;
                             $canReschedule = in_array($booking->status, $activeStatuses, true) && $slotDateTime && now()->diffInHours($slotDateTime, false) >= 12;
                             $isActive = in_array($booking->status, $activeStatuses, true);
+                            $hasAvailableSlot = (bool) $booking->slot;
                         @endphp
 
                         <article class="grid gap-4 px-5 py-5 lg:grid-cols-[1fr_320px] lg:items-start">
@@ -127,6 +128,11 @@
                                         -
                                         {{ $booking->slot?->end_time ? substr($booking->slot->end_time, 0, 5) : '--' }}
                                     </p>
+                                    @unless($hasAvailableSlot)
+                                        <p class="mt-3 rounded-md bg-amber-50 px-3 py-2 text-sm font-semibold text-amber-800">
+                                            This booking is linked to a slot that is no longer available. You can keep it in history or cancel it.
+                                        </p>
+                                    @endunless
                                     <p class="mt-2 text-sm text-stone-500">Booking #{{ $booking->id }}</p>
                                 </div>
                             </div>
@@ -137,7 +143,7 @@
                                         @csrf
                                         <label class="block">
                                             <span class="text-xs font-extrabold uppercase tracking-wide text-stone-500">Reschedule to</span>
-                                            <select name="slot_id" @disabled(!$canReschedule)
+                                            <select name="slot_id" @disabled(!$canReschedule || $availableSlots->isEmpty())
                                                     class="mt-1 block w-full rounded-md border-stone-300 text-sm shadow-sm focus:border-teal-600 focus:ring-teal-600 disabled:cursor-not-allowed disabled:bg-stone-100 disabled:text-stone-400">
                                                 @foreach($availableSlots as $slot)
                                                     @if($slot->id !== $booking->slot_id)
@@ -150,7 +156,7 @@
                                         </label>
 
                                         <div class="grid grid-cols-2 gap-2">
-                                            <button @disabled(!$canReschedule)
+                                            <button @disabled(!$canReschedule || $availableSlots->isEmpty())
                                                     class="rounded-md bg-stone-950 px-3 py-2 text-sm font-extrabold text-white hover:bg-stone-800 disabled:cursor-not-allowed disabled:bg-stone-300">
                                                 Reschedule
                                             </button>
@@ -161,9 +167,11 @@
                                         </div>
                                     </form>
 
-                                    @unless($canReschedule)
+                                    @if($availableSlots->isEmpty())
+                                        <p class="mt-3 text-xs font-medium text-stone-500">There are no available slots to reschedule right now.</p>
+                                    @elseif(!$canReschedule)
                                         <p class="mt-3 text-xs font-medium text-stone-500">Rescheduling opens until {{ $remaining['rescheduleCutoffHours'] }} hours before the booking.</p>
-                                    @endunless
+                                    @endif
                                 </div>
                             @endif
                         </article>

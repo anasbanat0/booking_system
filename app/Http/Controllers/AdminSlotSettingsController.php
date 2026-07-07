@@ -63,15 +63,13 @@ class AdminSlotSettingsController extends Controller
 
     public function updateLocation(Request $request, BookingLocation $location)
     {
-        abort_unless($request->user()->canManageAllBranches(), 403);
+        $this->authorizeBranchAccess($request, $location->id);
 
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:255', 'unique:booking_locations,name,' . $location->id],
             'default_capacity' => ['required', 'integer', 'min:1', 'max:500'],
             'is_active' => ['nullable', 'boolean'],
         ]);
-
-        abort_unless($request->user()->canManageAllBranches() || (int) $validated['booking_location_id'] === (int) $request->user()->booking_location_id, 403);
 
         $location->update([
             'name' => $validated['name'],
@@ -91,6 +89,8 @@ class AdminSlotSettingsController extends Controller
             'capacity' => ['required', 'integer', 'min:1', 'max:500'],
             'is_active' => ['nullable', 'boolean'],
         ]);
+
+        $this->authorizeBranchAccess($request, (int) $validated['booking_location_id']);
 
         $exists = SlotTemplate::where('booking_location_id', $validated['booking_location_id'])
             ->where('start_time', $validated['start_time'])
@@ -116,7 +116,7 @@ class AdminSlotSettingsController extends Controller
 
     public function updateTemplate(Request $request, SlotTemplate $template)
     {
-        abort_unless($request->user()->canManageAllBranches() || (int) $template->booking_location_id === (int) $request->user()->booking_location_id, 403);
+        $this->authorizeBranchAccess($request, (int) $template->booking_location_id);
 
         $validated = $request->validate([
             'start_time' => ['required', 'date_format:H:i'],
@@ -147,6 +147,15 @@ class AdminSlotSettingsController extends Controller
         return back()->with('success', 'Slot time updated successfully.');
     }
 
+    public function destroyTemplate(Request $request, SlotTemplate $template)
+    {
+        $this->authorizeBranchAccess($request, (int) $template->booking_location_id);
+
+        $template->delete();
+
+        return back()->with('success', 'Slot time deleted successfully.');
+    }
+
     public function storeHoliday(Request $request)
     {
         $validated = $request->validate([
@@ -170,5 +179,49 @@ class AdminSlotSettingsController extends Controller
         );
 
         return back()->with('success', 'Off day added successfully.');
+    }
+
+    public function updateHoliday(Request $request, Holiday $holiday)
+    {
+        if (!$request->user()->canManageAllBranches()) {
+            abort_unless((int) $holiday->booking_location_id === (int) $request->user()->booking_location_id, 403);
+        }
+
+        $validated = $request->validate([
+            'date' => ['required', 'date'],
+            'booking_location_id' => ['nullable', 'exists:booking_locations,id'],
+            'reason' => ['nullable', 'string', 'max:255'],
+        ]);
+
+        $locationId = $request->user()->canManageAllBranches()
+            ? ($validated['booking_location_id'] ?? null)
+            : $request->user()->booking_location_id;
+
+        $holiday->update([
+            'booking_location_id' => $locationId,
+            'date' => $validated['date'],
+            'reason' => $validated['reason'] ?? 'Hub closed',
+        ]);
+
+        return back()->with('success', 'Closed day updated successfully.');
+    }
+
+    public function destroyHoliday(Request $request, Holiday $holiday)
+    {
+        if (!$request->user()->canManageAllBranches()) {
+            abort_unless((int) $holiday->booking_location_id === (int) $request->user()->booking_location_id, 403);
+        }
+
+        $holiday->delete();
+
+        return back()->with('success', 'Closed day deleted successfully.');
+    }
+
+    private function authorizeBranchAccess(Request $request, int $locationId): void
+    {
+        abort_unless(
+            $request->user()->canManageAllBranches() || (int) $request->user()->booking_location_id === $locationId,
+            403
+        );
     }
 }

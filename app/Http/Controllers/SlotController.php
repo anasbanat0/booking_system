@@ -21,6 +21,9 @@ class SlotController extends Controller
 
         $slotTemplates = SlotTemplate::with('location')
             ->where('is_active', true)
+            ->when(!$request->user()->canManageAllBranches(), function ($query) use ($request) {
+                $query->where('booking_location_id', $request->user()->booking_location_id);
+            })
             ->whereHas('location', function ($query) {
                 $query->where('is_active', true);
             })
