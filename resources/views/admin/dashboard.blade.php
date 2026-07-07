@@ -37,6 +37,7 @@
 
     <main class="min-w-0 flex-1">
         <div class="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+        @include('admin.partials.topbar')
         <div class="mb-8">
             <div>
                 <p class="text-sm font-semibold uppercase tracking-wide text-blue-700">Admin Workspace</p>

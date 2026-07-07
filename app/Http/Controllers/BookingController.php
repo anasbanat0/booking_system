@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Booking;
+use App\Models\AdminNotification;
 use App\Models\BookingRule;
 use App\Models\Slot;
 use Carbon\Carbon;
@@ -27,13 +28,14 @@ class BookingController extends Controller
 
             $this->validateNewBooking($user->id, $slot);
 
-            Booking::create([
+            $booking = Booking::create([
                 'user_id' => $user->id,
                 'slot_id' => $slot->id,
                 'status' => 'booked',
             ]);
 
             $slot->increment('booked_count');
+            $this->notifyAdmins($booking, 'booking_created', 'New booking', $user->name . ' booked ' . $slot->date . ' from ' . $slot->start_time . ' to ' . $slot->end_time . '.');
 
             return back()->with('success', 'Booking confirmed.');
         });
@@ -80,6 +82,7 @@ class BookingController extends Controller
                 'status' => 'rescheduled',
                 'rescheduled_at' => now(),
             ]);
+            $this->notifyAdmins($booking, 'booking_rescheduled', 'Booking rescheduled', $booking->user->name . ' rescheduled to ' . $newSlot->date . ' from ' . $newSlot->start_time . ' to ' . $newSlot->end_time . '.');
 
             return back()->with('success', 'Booking rescheduled successfully.');
         });
@@ -106,6 +109,7 @@ class BookingController extends Controller
             }
 
             $this->refreshUserWarning($booking->user);
+            $this->notifyAdmins($booking, 'booking_cancelled', 'Booking cancelled', $booking->user->name . ' cancelled a booking on ' . $booking->slot->date . '.');
 
             return back()->with('success', 'Booking cancelled.');
         });
@@ -275,5 +279,19 @@ class BookingController extends Controller
                 'booking_warning_at' => now(),
             ]);
         }
+    }
+
+    private function notifyAdmins(Booking $booking, string $type, string $title, string $message): void
+    {
+        $booking->loadMissing('slot');
+
+        AdminNotification::create([
+            'booking_location_id' => $booking->slot?->booking_location_id,
+            'user_id' => $booking->user_id,
+            'booking_id' => $booking->id,
+            'type' => $type,
+            'title' => $title,
+            'message' => $message,
+        ]);
     }
 }

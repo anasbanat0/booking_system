@@ -10,7 +10,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 
-#[Fillable(['name', 'email', 'password', 'role', 'booking_warning_count', 'booking_warning_reason', 'booking_warning_at'])]
+#[Fillable(['name', 'email', 'phone', 'password', 'role', 'booking_location_id', 'booking_warning_count', 'booking_warning_reason', 'booking_warning_at'])]
 #[Hidden(['password', 'remember_token'])]
 class User extends Authenticatable
 {
@@ -26,6 +26,22 @@ class User extends Authenticatable
     {
         return $this->hasMany(Booking::class);
     }
+
+    public function managedLocation()
+    {
+        return $this->belongsTo(BookingLocation::class, 'booking_location_id');
+    }
+
+    public function canManageAllBranches(): bool
+    {
+        return $this->role === 'admin';
+    }
+
+    public function isAdminPanelUser(): bool
+    {
+        return in_array($this->role, ['admin', 'staff'], true);
+    }
+
     protected function casts(): array
     {
         return [

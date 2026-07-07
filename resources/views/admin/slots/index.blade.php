@@ -6,6 +6,7 @@
 
     <main class="min-w-0 flex-1">
         <div class="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+            @include('admin.partials.topbar')
             <div class="mb-8">
                 <p class="text-sm font-semibold uppercase tracking-wide text-blue-700">System Booking</p>
                 <h1 class="mt-2 text-3xl font-bold text-slate-950">Slots Time</h1>
@@ -113,6 +114,64 @@
                             </button>
                         </div>
                     </form>
+                </div>
+            </section>
+
+            <section class="mb-6 rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+                <div class="grid gap-6 lg:grid-cols-[1fr_1.2fr]">
+                    <div>
+                        <h2 class="text-lg font-bold text-slate-950">Close hub / off day</h2>
+                        <p class="mt-1 text-sm text-slate-500">
+                            Close registration for all branches or a specific branch on a selected date.
+                        </p>
+
+                        <form method="POST" action="{{ route('admin.holidays.store') }}" class="mt-4 grid gap-3 sm:grid-cols-2">
+                            @csrf
+                            <label class="block">
+                                <span class="text-sm font-medium text-slate-700">Date</span>
+                                <input type="date" name="date" required class="mt-1 block w-full rounded-md border-slate-300 text-sm shadow-sm focus:border-blue-500 focus:ring-blue-500">
+                            </label>
+
+                            @if(Auth::user()?->canManageAllBranches())
+                                <label class="block">
+                                    <span class="text-sm font-medium text-slate-700">Branch</span>
+                                    <select name="booking_location_id" class="mt-1 block w-full rounded-md border-slate-300 text-sm shadow-sm focus:border-blue-500 focus:ring-blue-500">
+                                        <option value="">All branches</option>
+                                        @foreach($allLocations as $location)
+                                            <option value="{{ $location->id }}">{{ $location->name }}</option>
+                                        @endforeach
+                                    </select>
+                                </label>
+                            @endif
+
+                            <label class="block sm:col-span-2">
+                                <span class="text-sm font-medium text-slate-700">Reason</span>
+                                <input name="reason" placeholder="Event, maintenance, hub closed..." class="mt-1 block w-full rounded-md border-slate-300 text-sm shadow-sm focus:border-blue-500 focus:ring-blue-500">
+                            </label>
+
+                            <div class="sm:col-span-2">
+                                <button class="rounded-md bg-slate-950 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800">
+                                    Close registration
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+
+                    <div class="rounded-lg border border-slate-200">
+                        <div class="border-b border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold text-slate-700">Upcoming closed days</div>
+                        <div class="divide-y divide-slate-100">
+                            @forelse($holidays as $holiday)
+                                <div class="flex items-center justify-between gap-3 px-4 py-3">
+                                    <div>
+                                        <p class="text-sm font-bold text-slate-950">{{ $holiday->date }}</p>
+                                        <p class="text-xs text-slate-500">{{ $holiday->location?->name ?? 'All branches' }} | {{ $holiday->reason ?? 'Closed' }}</p>
+                                    </div>
+                                </div>
+                            @empty
+                                <div class="px-4 py-8 text-center text-sm text-slate-500">No closed days yet.</div>
+                            @endforelse
+                        </div>
+                    </div>
                 </div>
             </section>
 

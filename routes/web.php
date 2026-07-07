@@ -3,6 +3,9 @@
 use App\Http\Controllers\AdminController;
 use App\Http\Controllers\AdminSiteContentController;
 use App\Http\Controllers\AdminSlotSettingsController;
+use App\Http\Controllers\AdminUserCalendarController;
+use App\Http\Controllers\AdminManageUserController;
+use App\Http\Controllers\AdminNotificationController;
 use App\Http\Controllers\BookingController;
 use App\Http\Controllers\CalendarController;
 use App\Http\Controllers\ProfileController;
@@ -71,6 +74,21 @@ Route::middleware(['auth', 'admin'])->group(function () {
     Route::post('/admin/bookings/{id}/status', [\App\Http\Controllers\AdminBookingController::class, 'updateStatus'])
         ->name('admin.bookings.status');
 
+    Route::get('/admin/users-calendar', [AdminUserCalendarController::class, 'index'])
+        ->name('admin.users-calendar.index');
+
+    Route::patch('/admin/users-calendar/bookings/{booking}', [AdminUserCalendarController::class, 'updateBooking'])
+        ->name('admin.users-calendar.bookings.update');
+
+    Route::get('/admin/manage/users', [AdminManageUserController::class, 'index'])->name('admin.manage.users.index');
+    Route::post('/admin/manage/users', [AdminManageUserController::class, 'store'])->name('admin.manage.users.store');
+    Route::patch('/admin/manage/users/{user}', [AdminManageUserController::class, 'update'])->name('admin.manage.users.update');
+    Route::get('/admin/manage/users/export', [AdminManageUserController::class, 'export'])->name('admin.manage.users.export');
+    Route::post('/admin/manage/users/import', [AdminManageUserController::class, 'import'])->name('admin.manage.users.import');
+
+    Route::get('/admin/notifications', [AdminNotificationController::class, 'index'])->name('admin.notifications.index');
+    Route::post('/admin/notifications/read', [AdminNotificationController::class, 'markRead'])->name('admin.notifications.read');
+
     Route::get('/admin/slots', [AdminSlotSettingsController::class, 'index'])->name('admin.slots.index');
     Route::post('/admin/generate-slots', [SlotController::class, 'generate'])->name('slots.generate');
     Route::patch('/admin/locations/{location}', [AdminSlotSettingsController::class, 'updateLocation'])
@@ -81,6 +99,8 @@ Route::middleware(['auth', 'admin'])->group(function () {
         ->name('admin.slot-templates.store');
     Route::patch('/admin/slot-templates/{template}', [AdminSlotSettingsController::class, 'updateTemplate'])
         ->name('admin.slot-templates.update');
+    Route::post('/admin/holidays', [AdminSlotSettingsController::class, 'storeHoliday'])
+        ->name('admin.holidays.store');
 
     Route::get('/admin/content', [AdminSiteContentController::class, 'index'])->name('admin.content.index');
     Route::patch('/admin/content', [AdminSiteContentController::class, 'update'])->name('admin.content.update');

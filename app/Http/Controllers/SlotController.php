@@ -39,13 +39,17 @@ class SlotController extends Controller
                 continue;
             }
 
-            // Skip Holidays
-            $isHoliday = Holiday::where('date', $date->toDateString())->exists();
-            if ($isHoliday) {
-                continue;
-            }
-
             foreach ($slotTemplates as $template) {
+                $isHoliday = Holiday::where('date', $date->toDateString())
+                    ->where(function ($query) use ($template) {
+                        $query->whereNull('booking_location_id')
+                            ->orWhere('booking_location_id', $template->booking_location_id);
+                    })
+                    ->exists();
+
+                if ($isHoliday) {
+                    continue;
+                }
 
                 Slot::updateOrCreate(
                     [

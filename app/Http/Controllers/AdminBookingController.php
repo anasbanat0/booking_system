@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Booking;
+use App\Models\AdminNotification;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
@@ -15,6 +16,12 @@ class AdminBookingController extends Controller
         $query = Booking::with(['user', 'slot.location']);
         $statuses = ['booked', 'completed', 'no_show', 'cancelled', 'rescheduled'];
 
+        if (!$request->user()->canManageAllBranches()) {
+            $query->whereHas('slot', function ($slotQuery) use ($request) {
+                $slotQuery->where('booking_location_id', $request->user()->booking_location_id);
+            });
+        }
+
         if ($request->filled('status') && in_array($request->status, $statuses, true)) {
             $query->where('status', $request->status);
         }
@@ -25,6 +32,9 @@ class AdminBookingController extends Controller
 
         $bookings = $query->latest()->paginate(10)->withQueryString();
         $statusCounts = Booking::selectRaw('status, count(*) as total')
+            ->when(!$request->user()->canManageAllBranches(), function ($countQuery) use ($request) {
+                $countQuery->whereHas('slot', fn ($slotQuery) => $slotQuery->where('booking_location_id', $request->user()->booking_location_id));
+            })
             ->groupBy('status')
             ->pluck('total', 'status');
 
@@ -40,6 +50,10 @@ class AdminBookingController extends Controller
         $booking = DB::transaction(function () use ($id, $validated) {
             $booking = Booking::with(['slot', 'user'])->lockForUpdate()->findOrFail($id);
             $slot = $booking->slot()->lockForUpdate()->firstOrFail();
+
+            if (!request()->user()->canManageAllBranches() && (int) $slot->booking_location_id !== (int) request()->user()->booking_location_id) {
+                abort(403);
+            }
             $activeStatuses = ['booked', 'rescheduled'];
             $wasActive = in_array($booking->status, $activeStatuses, true);
             $willBeActive = in_array($validated['status'], $activeStatuses, true);
@@ -64,6 +78,15 @@ class AdminBookingController extends Controller
             if (in_array($booking->status, ['cancelled', 'no_show'], true)) {
                 $this->refreshUserWarning($booking);
             }
+
+            AdminNotification::create([
+                'booking_location_id' => $booking->slot?->booking_location_id,
+                'user_id' => $booking->user_id,
+                'booking_id' => $booking->id,
+                'type' => 'booking_status_updated',
+                'title' => 'Booking status updated',
+                'message' => $booking->user?->name . ' status changed to ' . str_replace('_', ' ', $booking->status) . '.',
+            ]);
 
             return $booking;
         });

@@ -6,6 +6,7 @@
 
     <main class="min-w-0 flex-1">
         <div class="mx-auto max-w-5xl px-4 py-8 sm:px-6 lg:px-8">
+            @include('admin.partials.topbar')
             <div class="mb-8">
                 <p class="text-sm font-semibold uppercase tracking-wide text-blue-700">Student Interface</p>
                 <h1 class="mt-2 text-3xl font-bold text-slate-950">Homepage Content</h1>

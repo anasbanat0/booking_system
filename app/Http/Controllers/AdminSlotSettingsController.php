@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\BookingLocation;
 use App\Models\BookingRule;
+use App\Models\Holiday;
 use App\Models\SlotTemplate;
 use Illuminate\Http\Request;
 
@@ -14,14 +15,31 @@ class AdminSlotSettingsController extends Controller
         $locations = BookingLocation::with(['slotTemplates' => function ($query) {
             $query->orderBy('start_time');
         }])->orderBy('name')->get();
+        $visibleLocations = request()->user()->canManageAllBranches()
+            ? $locations
+            : $locations->where('id', request()->user()->booking_location_id)->values();
+        $holidays = Holiday::with('location')
+            ->when(!request()->user()->canManageAllBranches(), function ($query) {
+                $query->where('booking_location_id', request()->user()->booking_location_id);
+            })
+            ->whereDate('date', '>=', now()->subDays(7)->toDateString())
+            ->orderBy('date')
+            ->get();
 
         $bookingRules = BookingRule::current();
 
-        return view('admin.slots.index', compact('locations', 'bookingRules'));
+        return view('admin.slots.index', [
+            'locations' => $visibleLocations,
+            'allLocations' => $locations,
+            'holidays' => $holidays,
+            'bookingRules' => $bookingRules,
+        ]);
     }
 
     public function updateRules(Request $request)
     {
+        abort_unless($request->user()->canManageAllBranches(), 403);
+
         $validated = $request->validate([
             'weekly_limit' => ['required', 'integer', 'min:1', 'max:100'],
             'monthly_limit' => ['required', 'integer', 'min:1', 'max:500'],
@@ -41,11 +59,15 @@ class AdminSlotSettingsController extends Controller
 
     public function updateLocation(Request $request, BookingLocation $location)
     {
+        abort_unless($request->user()->canManageAllBranches(), 403);
+
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:255', 'unique:booking_locations,name,' . $location->id],
             'default_capacity' => ['required', 'integer', 'min:1', 'max:500'],
             'is_active' => ['nullable', 'boolean'],
         ]);
+
+        abort_unless($request->user()->canManageAllBranches() || (int) $validated['booking_location_id'] === (int) $request->user()->booking_location_id, 403);
 
         $location->update([
             'name' => $validated['name'],
@@ -90,6 +112,8 @@ class AdminSlotSettingsController extends Controller
 
     public function updateTemplate(Request $request, SlotTemplate $template)
     {
+        abort_unless($request->user()->canManageAllBranches() || (int) $template->booking_location_id === (int) $request->user()->booking_location_id, 403);
+
         $validated = $request->validate([
             'start_time' => ['required', 'date_format:H:i'],
             'end_time' => ['required', 'date_format:H:i', 'after:start_time'],
@@ -117,5 +141,30 @@ class AdminSlotSettingsController extends Controller
         ]);
 
         return back()->with('success', 'Slot time updated successfully.');
+    }
+
+    public function storeHoliday(Request $request)
+    {
+        $validated = $request->validate([
+            'date' => ['required', 'date'],
+            'booking_location_id' => ['nullable', 'exists:booking_locations,id'],
+            'reason' => ['nullable', 'string', 'max:255'],
+        ]);
+
+        $locationId = $request->user()->canManageAllBranches()
+            ? ($validated['booking_location_id'] ?? null)
+            : $request->user()->booking_location_id;
+
+        Holiday::updateOrCreate(
+            [
+                'booking_location_id' => $locationId,
+                'date' => $validated['date'],
+            ],
+            [
+                'reason' => $validated['reason'] ?? 'Hub closed',
+            ]
+        );
+
+        return back()->with('success', 'Off day added successfully.');
     }
 }

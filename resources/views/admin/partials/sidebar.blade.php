@@ -13,6 +13,18 @@
             'icon' => 'M7 3v2H5a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2V3h-2v2H9V3H7Zm12 8H5v8h14v-8Z',
         ],
         [
+            'label' => 'Users Calendar',
+            'route' => 'admin.users-calendar.index',
+            'active' => request()->routeIs('admin.users-calendar.*'),
+            'icon' => 'M5 3a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2H5Zm2 4h2v2H7V7Zm4 0h6v2h-6V7Zm-4 4h2v2H7v-2Zm4 0h6v2h-6v-2Zm-4 4h2v2H7v-2Zm4 0h6v2h-6v-2Z',
+        ],
+        [
+            'label' => 'Notifications',
+            'route' => 'admin.notifications.index',
+            'active' => request()->routeIs('admin.notifications.*'),
+            'icon' => 'M12 22a2.5 2.5 0 0 0 2.45-2h-4.9A2.5 2.5 0 0 0 12 22Zm7-6V11a7 7 0 0 0-5-6.71V3a2 2 0 1 0-4 0v1.29A7 7 0 0 0 5 11v5l-2 2v1h18v-1l-2-2Z',
+        ],
+        [
             'label' => 'Slots Time',
             'route' => 'admin.slots.index',
             'active' => request()->routeIs('admin.slots.*') || request()->routeIs('admin.locations.*') || request()->routeIs('admin.slot-templates.*') || request()->routeIs('admin.booking-rules.*'),
@@ -25,6 +37,15 @@
             'icon' => 'M4 5a2 2 0 0 1 2-2h9l5 5v11a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V5Zm10 0v4h4l-4-4ZM7 13h10v-2H7v2Zm0 4h7v-2H7v2Z',
         ],
     ];
+
+    if (Auth::user()?->canManageAllBranches()) {
+        $adminLinks[] = [
+            'label' => 'Manage Users',
+            'route' => 'admin.manage.users.index',
+            'active' => request()->routeIs('admin.manage.users.*'),
+            'icon' => 'M16 11c1.66 0 3-1.34 3-3s-1.34-3-3-3 1.34-3 3 1.34 3 3 3ZM8 11c1.66 0 3-1.34 3-3S9.66 5 8 5 5 6.34 5 8s1.34 3 3 3Zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5C15 14.17 10.33 13 8 13Zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5C23 14.17 18.33 13 16 13Z',
+        ];
+    }
 @endphp
 
 <aside class="hidden w-72 shrink-0 border-r border-slate-200 bg-white lg:block">
