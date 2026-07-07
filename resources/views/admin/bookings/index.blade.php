@@ -48,7 +48,14 @@
         <section class="rounded-lg border border-slate-200 bg-white shadow-sm">
             <div class="border-b border-slate-200 px-5 py-4">
                 <form method="GET" class="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
-                    <div class="grid w-full gap-3 sm:grid-cols-[minmax(0,260px)_auto]">
+                    <div class="grid w-full gap-3 sm:grid-cols-2 lg:grid-cols-[minmax(0,220px)_150px_160px_minmax(0,220px)_auto]">
+                        <label class="block">
+                            <span class="text-sm font-medium text-slate-700">Search</span>
+                            <input name="search"
+                                   value="{{ request('search') }}"
+                                   placeholder="Name, email, phone"
+                                   class="mt-1 block w-full rounded-md border-slate-300 text-sm shadow-sm focus:border-blue-500 focus:ring-blue-500">
+                        </label>
                         <label class="block">
                             <span class="text-sm font-medium text-slate-700">Status</span>
                             <select name="status"
@@ -61,12 +68,29 @@
                                 @endforeach
                             </select>
                         </label>
+                        <label class="block">
+                            <span class="text-sm font-medium text-slate-700">Date</span>
+                            <input type="date"
+                                   name="date"
+                                   value="{{ request('date') }}"
+                                   class="mt-1 block w-full rounded-md border-slate-300 text-sm shadow-sm focus:border-blue-500 focus:ring-blue-500">
+                        </label>
+                        <label class="block">
+                            <span class="text-sm font-medium text-slate-700">Period</span>
+                            <select name="period"
+                                    class="mt-1 block w-full rounded-md border-slate-300 text-sm shadow-sm focus:border-blue-500 focus:ring-blue-500">
+                                <option value="">All periods</option>
+                                @foreach($periods as $period)
+                                    <option value="{{ $period }}" @selected(request('period') === $period)>{{ $period }}</option>
+                                @endforeach
+                            </select>
+                        </label>
 
                         <div class="flex items-end gap-2">
                             <button class="inline-flex h-10 items-center justify-center rounded-md bg-slate-950 px-4 text-sm font-semibold text-white hover:bg-slate-800">
                                 Filter
                             </button>
-                            @if(request()->hasAny(['status', 'user_id']))
+                            @if(request()->hasAny(['status', 'user_id', 'date', 'period', 'search']))
                                 <a href="{{ route('admin.bookings.index') }}"
                                    class="inline-flex h-10 items-center justify-center rounded-md border border-slate-300 px-4 text-sm font-semibold text-slate-700 hover:bg-slate-100">
                                     Clear
@@ -78,6 +102,37 @@
                     <div class="text-sm text-slate-500">
                         Showing {{ $bookings->firstItem() ?? 0 }}-{{ $bookings->lastItem() ?? 0 }} of {{ $bookings->total() }}
                     </div>
+                </form>
+            </div>
+
+            <div class="border-b border-slate-200 bg-slate-50 px-5 py-4">
+                <form method="POST" action="{{ route('admin.bookings.manual') }}" class="grid gap-3 lg:grid-cols-[minmax(0,260px)_minmax(0,1fr)_auto] lg:items-end">
+                    @csrf
+                    <label class="block">
+                        <span class="text-sm font-medium text-slate-700">Create booking for student</span>
+                        <select name="user_id"
+                                class="mt-1 block w-full rounded-md border-slate-300 text-sm shadow-sm focus:border-blue-500 focus:ring-blue-500">
+                            <option value="">Choose student</option>
+                            @foreach($users as $user)
+                                <option value="{{ $user->id }}">{{ $user->name }} - {{ $user->email }}</option>
+                            @endforeach
+                        </select>
+                    </label>
+                    <label class="block">
+                        <span class="text-sm font-medium text-slate-700">Available slot</span>
+                        <select name="slot_id"
+                                class="mt-1 block w-full rounded-md border-slate-300 text-sm shadow-sm focus:border-blue-500 focus:ring-blue-500">
+                            <option value="">Choose slot</option>
+                            @foreach($slots as $slot)
+                                <option value="{{ $slot->id }}">
+                                    {{ $slot->location?->name }} - {{ $slot->date }} - {{ $slot->start_time }} to {{ $slot->end_time }} ({{ $slot->capacity - $slot->booked_count }} seats)
+                                </option>
+                            @endforeach
+                        </select>
+                    </label>
+                    <button class="inline-flex h-10 items-center justify-center rounded-md bg-blue-700 px-4 text-sm font-semibold text-white hover:bg-blue-800">
+                        Add booking
+                    </button>
                 </form>
             </div>
 

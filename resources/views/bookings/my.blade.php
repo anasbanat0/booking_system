@@ -60,6 +60,24 @@
             </div>
         @endif
 
+        <div class="mb-6 grid gap-3 sm:grid-cols-3">
+            <div class="rounded-lg border border-stone-200 bg-white p-4 shadow-sm">
+                <p class="text-xs font-extrabold uppercase tracking-wide text-stone-500">Weekly remaining</p>
+                <p class="mt-2 text-3xl font-extrabold text-stone-950">{{ $remaining['weekly'] }}</p>
+                <p class="mt-1 text-xs text-stone-500">of {{ $remaining['weeklyLimit'] }} weekly bookings</p>
+            </div>
+            <div class="rounded-lg border border-stone-200 bg-white p-4 shadow-sm">
+                <p class="text-xs font-extrabold uppercase tracking-wide text-stone-500">Monthly remaining</p>
+                <p class="mt-2 text-3xl font-extrabold text-stone-950">{{ $remaining['monthly'] }}</p>
+                <p class="mt-1 text-xs text-stone-500">of {{ $remaining['monthlyLimit'] }} monthly bookings</p>
+            </div>
+            <div class="rounded-lg border border-stone-200 bg-white p-4 shadow-sm">
+                <p class="text-xs font-extrabold uppercase tracking-wide text-stone-500">Warning status</p>
+                <p class="mt-2 text-sm font-bold text-stone-950">{{ Auth::user()?->booking_warning_reason ?? 'No violations' }}</p>
+                <p class="mt-1 text-xs text-stone-500">Reschedule cutoff: {{ $remaining['rescheduleCutoffHours'] }} hours</p>
+            </div>
+        </div>
+
         <div class="mb-5 flex rounded-lg border border-stone-200 bg-white p-1 shadow-sm">
             <a href="{{ route('bookings.my', ['type' => 'upcoming']) }}"
                class="flex-1 rounded-md px-4 py-2 text-center text-sm font-extrabold {{ $selectedType === 'upcoming' ? 'bg-stone-950 text-white' : 'text-stone-600 hover:bg-stone-100' }}">
@@ -144,7 +162,7 @@
                                     </form>
 
                                     @unless($canReschedule)
-                                        <p class="mt-3 text-xs font-medium text-stone-500">Rescheduling opens until 12 hours before the booking.</p>
+                                        <p class="mt-3 text-xs font-medium text-stone-500">Rescheduling opens until {{ $remaining['rescheduleCutoffHours'] }} hours before the booking.</p>
                                     @endunless
                                 </div>
                             @endif

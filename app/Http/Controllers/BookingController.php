@@ -3,12 +3,14 @@
 namespace App\Http\Controllers;
 
 use App\Models\Booking;
+use App\Models\ActivityLog;
 use App\Models\AdminNotification;
 use App\Models\BookingRule;
 use App\Models\Slot;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Validation\ValidationException;
 
 class BookingController extends Controller
@@ -36,6 +38,12 @@ class BookingController extends Controller
 
             $slot->increment('booked_count');
             $this->notifyAdmins($booking, 'booking_created', 'New booking', $user->name . ' booked ' . $slot->date . ' from ' . $slot->start_time . ' to ' . $slot->end_time . '.');
+            $this->emailUser($booking, 'Booking confirmed', 'Your booking is confirmed for ' . $slot->date . ' from ' . $slot->start_time . ' to ' . $slot->end_time . '.');
+            ActivityLog::record('booking_created', 'Booking created', $user->name . ' created a booking.', [
+                'user_id' => $user->id,
+                'booking_id' => $booking->id,
+                'properties' => ['slot_id' => $slot->id],
+            ]);
 
             return back()->with('success', 'Booking confirmed.');
         });
@@ -57,9 +65,10 @@ class BookingController extends Controller
             }
 
             $currentSlotDateTime = Carbon::parse($booking->slot->date . ' ' . $booking->slot->start_time);
+            $bookingRules = BookingRule::current();
 
-            if (now()->diffInHours($currentSlotDateTime, false) < 12) {
-                return back()->with('error', 'Rescheduling is allowed at least 12 hours before the booking.');
+            if (now()->diffInHours($currentSlotDateTime, false) < $bookingRules->reschedule_cutoff_hours) {
+                return back()->with('error', 'Rescheduling is allowed at least ' . $bookingRules->reschedule_cutoff_hours . ' hours before the booking.');
             }
 
             $newSlot = Slot::lockForUpdate()->findOrFail($request->slot_id);
@@ -83,6 +92,12 @@ class BookingController extends Controller
                 'rescheduled_at' => now(),
             ]);
             $this->notifyAdmins($booking, 'booking_rescheduled', 'Booking rescheduled', $booking->user->name . ' rescheduled to ' . $newSlot->date . ' from ' . $newSlot->start_time . ' to ' . $newSlot->end_time . '.');
+            $this->emailUser($booking, 'Booking rescheduled', 'Your booking was rescheduled to ' . $newSlot->date . ' from ' . $newSlot->start_time . ' to ' . $newSlot->end_time . '.');
+            ActivityLog::record('booking_rescheduled', 'Booking rescheduled', $booking->user->name . ' rescheduled a booking.', [
+                'user_id' => $booking->user_id,
+                'booking_id' => $booking->id,
+                'properties' => ['slot_id' => $newSlot->id],
+            ]);
 
             return back()->with('success', 'Booking rescheduled successfully.');
         });
@@ -110,6 +125,11 @@ class BookingController extends Controller
 
             $this->refreshUserWarning($booking->user);
             $this->notifyAdmins($booking, 'booking_cancelled', 'Booking cancelled', $booking->user->name . ' cancelled a booking on ' . $booking->slot->date . '.');
+            $this->emailUser($booking, 'Booking cancelled', 'Your booking on ' . $booking->slot->date . ' has been cancelled.');
+            ActivityLog::record('booking_cancelled', 'Booking cancelled', $booking->user->name . ' cancelled a booking.', [
+                'user_id' => $booking->user_id,
+                'booking_id' => $booking->id,
+            ]);
 
             return back()->with('success', 'Booking cancelled.');
         });
@@ -131,7 +151,34 @@ class BookingController extends Controller
             ->orderBy('start_time')
             ->get();
 
-        return view('bookings.my', compact('bookings', 'availableSlots'));
+        $bookingRules = BookingRule::current();
+        $weeklyUsed = Booking::where('user_id', $request->user()->id)
+            ->whereIn('status', $this->activeStatuses)
+            ->whereHas('slot', function ($query) {
+                $query->whereBetween('date', [
+                    now()->startOfWeek()->toDateString(),
+                    now()->endOfWeek()->toDateString(),
+                ]);
+            })
+            ->count();
+        $monthlyUsed = Booking::where('user_id', $request->user()->id)
+            ->whereIn('status', $this->activeStatuses)
+            ->whereHas('slot', function ($query) {
+                $query->whereBetween('date', [
+                    now()->startOfMonth()->toDateString(),
+                    now()->endOfMonth()->toDateString(),
+                ]);
+            })
+            ->count();
+        $remaining = [
+            'weekly' => max($bookingRules->weekly_limit - $weeklyUsed, 0),
+            'monthly' => max($bookingRules->monthly_limit - $monthlyUsed, 0),
+            'weeklyLimit' => $bookingRules->weekly_limit,
+            'monthlyLimit' => $bookingRules->monthly_limit,
+            'rescheduleCutoffHours' => $bookingRules->reschedule_cutoff_hours,
+        ];
+
+        return view('bookings.my', compact('bookings', 'availableSlots', 'remaining'));
     }
 
     private function validateNewBooking(int $userId, Slot $slot): void
@@ -293,5 +340,18 @@ class BookingController extends Controller
             'title' => $title,
             'message' => $message,
         ]);
+    }
+
+    private function emailUser(Booking $booking, string $subject, string $message): void
+    {
+        $booking->loadMissing('user');
+
+        if (!$booking->user?->email) {
+            return;
+        }
+
+        Mail::raw($message, function ($mail) use ($booking, $subject) {
+            $mail->to($booking->user->email)->subject($subject);
+        });
     }
 }

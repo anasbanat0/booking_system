@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Auth;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Auth\LoginRequest;
+use App\Models\ActivityLog;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -37,6 +38,10 @@ class AuthenticatedSessionController extends Controller
         $request->authenticate();
 
         $request->session()->regenerate();
+        ActivityLog::record('login', 'User login', $request->user()->name . ' signed in.', [
+            'user_id' => $request->user()->id,
+            'properties' => ['role' => $request->user()->role],
+        ]);
 
         if ($request->user()?->role === 'admin') {
             return redirect()->intended(route('admin.dashboard', absolute: false));

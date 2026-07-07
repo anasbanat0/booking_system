@@ -13,6 +13,7 @@ class Booking extends Model
         'status',
         'cancelled_at',
         'rescheduled_at',
+        'reminder_sent_at',
     ];
 
     public function user()

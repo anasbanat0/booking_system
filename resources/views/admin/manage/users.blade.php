@@ -124,6 +124,19 @@
                                             <button class="block rounded-md border border-slate-300 px-3 py-2 text-sm font-bold text-slate-700 hover:bg-slate-100">Save</button>
                                         </td>
                                     </form>
+                                    <td class="hidden">
+                                        <form method="POST" action="{{ route('admin.manage.users.password-link', $user) }}">
+                                            @csrf
+                                        </form>
+                                    </td>
+                                </tr>
+                                <tr class="bg-slate-50">
+                                    <td colspan="5" class="px-5 py-2 text-right">
+                                        <form method="POST" action="{{ route('admin.manage.users.password-link', $user) }}">
+                                            @csrf
+                                            <button class="text-xs font-bold text-blue-700 hover:text-blue-900">Resend password setup link</button>
+                                        </form>
+                                    </td>
                                 </tr>
                             @endforeach
                         </tbody>

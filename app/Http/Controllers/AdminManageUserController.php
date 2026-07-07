@@ -3,8 +3,10 @@
 namespace App\Http\Controllers;
 
 use App\Models\BookingLocation;
+use App\Models\ActivityLog;
 use App\Models\User;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Password;
 use Illuminate\Validation\Rule;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
@@ -48,13 +50,19 @@ class AdminManageUserController extends Controller
             'password' => ['nullable', 'string', 'min:6'],
         ]);
 
-        User::create([
+        $user = User::create([
             'name' => $validated['name'],
             'email' => $validated['email'],
             'phone' => $validated['phone'] ?? null,
             'role' => $validated['role'],
             'booking_location_id' => $validated['role'] === 'staff' ? ($validated['booking_location_id'] ?? null) : null,
             'password' => $validated['password'] ?? 'password',
+        ]);
+
+        Password::sendResetLink(['email' => $user->email]);
+        ActivityLog::record('user_created', 'User created', $user->name . ' was created from Manage Users.', [
+            'user_id' => $user->id,
+            'properties' => ['role' => $user->role],
         ]);
 
         return back()->with('success', 'User created successfully.');
@@ -86,6 +94,10 @@ class AdminManageUserController extends Controller
         }
 
         $user->update($payload);
+        ActivityLog::record('user_updated', 'User updated', $user->name . ' was updated from Manage Users.', [
+            'user_id' => $user->id,
+            'properties' => ['role' => $user->role],
+        ]);
 
         return back()->with('success', 'User updated successfully.');
     }
@@ -117,6 +129,18 @@ class AdminManageUserController extends Controller
         }, $filename, ['Content-Type' => 'text/csv']);
     }
 
+    public function resendPasswordLink(User $user)
+    {
+        abort_unless(request()->user()->canManageAllBranches(), 403);
+
+        Password::sendResetLink(['email' => $user->email]);
+        ActivityLog::record('password_link_sent', 'Password setup link sent', 'A password setup link was sent to ' . $user->email . '.', [
+            'user_id' => $user->id,
+        ]);
+
+        return back()->with('success', 'Password setup link sent to ' . $user->email . '.');
+    }
+
     public function import(Request $request)
     {
         abort_unless($request->user()->canManageAllBranches(), 403);
@@ -145,7 +169,7 @@ class AdminManageUserController extends Controller
                 continue;
             }
 
-            User::updateOrCreate(
+            $user = User::updateOrCreate(
                 ['email' => trim($data['email'])],
                 [
                     'name' => trim($data['name']),
@@ -155,6 +179,12 @@ class AdminManageUserController extends Controller
                     'password' => $data['password'] ?? 'password',
                 ]
             );
+
+            Password::sendResetLink(['email' => $user->email]);
+            ActivityLog::record('user_imported', 'User imported', $user->name . ' was imported or updated from CSV.', [
+                'user_id' => $user->id,
+                'properties' => ['role' => $user->role],
+            ]);
 
             $imported++;
         }

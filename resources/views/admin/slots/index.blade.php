@@ -62,7 +62,19 @@
                                class="mt-1 block w-full rounded-md border-slate-300 text-sm shadow-sm focus:border-blue-500 focus:ring-blue-500">
                     </label>
 
-                    <div class="space-y-3 md:col-span-2">
+                    <label class="block">
+                        <span class="text-sm font-medium text-slate-700">Reschedule cutoff hours</span>
+                        <input type="number" name="reschedule_cutoff_hours" min="1" max="168" value="{{ old('reschedule_cutoff_hours', $bookingRules->reschedule_cutoff_hours) }}"
+                               class="mt-1 block w-full rounded-md border-slate-300 text-sm shadow-sm focus:border-blue-500 focus:ring-blue-500">
+                    </label>
+
+                    <label class="block">
+                        <span class="text-sm font-medium text-slate-700">Reminder hours before</span>
+                        <input type="number" name="reminder_hours_before" min="1" max="168" value="{{ old('reminder_hours_before', $bookingRules->reminder_hours_before) }}"
+                               class="mt-1 block w-full rounded-md border-slate-300 text-sm shadow-sm focus:border-blue-500 focus:ring-blue-500">
+                    </label>
+
+                    <div class="space-y-3 md:col-span-4">
                         <label class="flex items-center gap-2">
                             <input type="checkbox" name="enforce_one_booking_per_day" value="1" @checked($bookingRules->enforce_one_booking_per_day)
                                    class="rounded border-slate-300 text-blue-600 shadow-sm focus:ring-blue-500">

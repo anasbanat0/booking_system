@@ -6,6 +6,7 @@ use App\Http\Controllers\AdminSlotSettingsController;
 use App\Http\Controllers\AdminUserCalendarController;
 use App\Http\Controllers\AdminManageUserController;
 use App\Http\Controllers\AdminNotificationController;
+use App\Http\Controllers\AdminActivityLogController;
 use App\Http\Controllers\BookingController;
 use App\Http\Controllers\CalendarController;
 use App\Http\Controllers\ProfileController;
@@ -62,11 +63,13 @@ Route::middleware('auth')->group(function () {
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
     Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
 
-    Route::get('/calendar', [CalendarController::class, 'index'])->name('calendar.index');
-    Route::post('/book-slot', [BookingController::class, 'store'])->name('book.slot');
-    Route::get('/my-bookings', [BookingController::class, 'myBookings'])->name('bookings.my');
-    Route::post('/booking/{booking}/cancel', [BookingController::class, 'cancel'])->name('bookings.cancel');
-    Route::post('/booking/{booking}/reschedule', [BookingController::class, 'reschedule'])->name('bookings.reschedule');
+    Route::middleware('student')->group(function () {
+        Route::get('/calendar', [CalendarController::class, 'index'])->name('calendar.index');
+        Route::post('/book-slot', [BookingController::class, 'store'])->name('book.slot');
+        Route::get('/my-bookings', [BookingController::class, 'myBookings'])->name('bookings.my');
+        Route::post('/booking/{booking}/cancel', [BookingController::class, 'cancel'])->name('bookings.cancel');
+        Route::post('/booking/{booking}/reschedule', [BookingController::class, 'reschedule'])->name('bookings.reschedule');
+    });
 });
 
 Route::middleware(['auth', 'admin'])->group(function () {
@@ -74,6 +77,9 @@ Route::middleware(['auth', 'admin'])->group(function () {
 
     Route::get('/admin/bookings', [\App\Http\Controllers\AdminBookingController::class, 'index'])
         ->name('admin.bookings.index');
+
+    Route::post('/admin/bookings/manual', [\App\Http\Controllers\AdminBookingController::class, 'storeManual'])
+        ->name('admin.bookings.manual');
 
     Route::post('/admin/bookings/{id}/status', [\App\Http\Controllers\AdminBookingController::class, 'updateStatus'])
         ->name('admin.bookings.status');
@@ -87,11 +93,14 @@ Route::middleware(['auth', 'admin'])->group(function () {
     Route::get('/admin/manage/users', [AdminManageUserController::class, 'index'])->name('admin.manage.users.index');
     Route::post('/admin/manage/users', [AdminManageUserController::class, 'store'])->name('admin.manage.users.store');
     Route::patch('/admin/manage/users/{user}', [AdminManageUserController::class, 'update'])->name('admin.manage.users.update');
+    Route::post('/admin/manage/users/{user}/password-link', [AdminManageUserController::class, 'resendPasswordLink'])->name('admin.manage.users.password-link');
     Route::get('/admin/manage/users/export', [AdminManageUserController::class, 'export'])->name('admin.manage.users.export');
     Route::post('/admin/manage/users/import', [AdminManageUserController::class, 'import'])->name('admin.manage.users.import');
 
     Route::get('/admin/notifications', [AdminNotificationController::class, 'index'])->name('admin.notifications.index');
     Route::post('/admin/notifications/read', [AdminNotificationController::class, 'markRead'])->name('admin.notifications.read');
+
+    Route::get('/admin/activity', [AdminActivityLogController::class, 'index'])->name('admin.activity.index');
 
     Route::get('/admin/slots', [AdminSlotSettingsController::class, 'index'])->name('admin.slots.index');
     Route::post('/admin/generate-slots', [SlotController::class, 'generate'])->name('slots.generate');
