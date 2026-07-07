@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Slot;
 use App\Models\Holiday;
+use App\Models\BookingRule;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 
@@ -15,6 +16,7 @@ class CalendarController extends Controller
             ? Carbon::parse($request->period)
             : now();
         [$startOfWeek, $endOfWeek] = $this->monthWeekRange($selectedDate);
+        $openPeriods = $this->openBookingPeriods(BookingRule::current());
         $studentLocationId = $request->user()->booking_location_id;
 
         $weekDays = [];
@@ -26,6 +28,7 @@ class CalendarController extends Controller
 
             $isFriday = $date->isFriday();
             $isPast = $date->isBefore(now()->startOfDay());
+            $isOpenBookingPeriod = collect($openPeriods)->contains(fn ($period) => $date->betweenIncluded($period[0], $period[1]));
 
             $holiday = Holiday::where('date', $date->toDateString())
                 ->where(function ($query) use ($studentLocationId) {
@@ -37,7 +40,7 @@ class CalendarController extends Controller
 
             $slots = [];
 
-            if (!$isFriday && !$isHoliday && !$isPast) {
+            if (!$isFriday && !$isHoliday && !$isPast && $isOpenBookingPeriod) {
                 $slots = Slot::with('location')
                     ->where('date', $date->toDateString())
                     ->where('is_active', true)
@@ -54,6 +57,7 @@ class CalendarController extends Controller
                 'date' => $date,
                 'is_off' => $isFriday || $isHoliday,
                 'is_past' => $isPast,
+                'is_current_booking_period' => $isOpenBookingPeriod,
                 'off_reason' => $isFriday ? 'Friday holiday' : ($holiday?->reason ?? null),
                 'slots' => $slots
             ];
@@ -113,5 +117,19 @@ class CalendarController extends Controller
             15 => $periodStart->copy()->day(8),
             default => $periodStart->copy()->day(15),
         };
+    }
+
+    private function openBookingPeriods(BookingRule $bookingRule): array
+    {
+        [$currentStart, $currentEnd] = $this->monthWeekRange(now());
+        $periods = [[$currentStart, $currentEnd]];
+
+        if ((int) $bookingRule->advance_booking_days > 0 && now()->startOfDay()->gte($currentEnd->copy()->subDays($bookingRule->advance_booking_days - 1)->startOfDay())) {
+            $nextStart = $this->nextPeriodDate($currentStart);
+            [$nextPeriodStart, $nextPeriodEnd] = $this->monthWeekRange($nextStart);
+            $periods[] = [$nextPeriodStart, $nextPeriodEnd];
+        }
+
+        return $periods;
     }
 }

@@ -11,6 +11,7 @@ class BookingRule extends Model
         'monthly_limit',
         'reschedule_cutoff_hours',
         'reminder_hours_before',
+        'advance_booking_days',
         'enforce_one_booking_per_day',
         'enforce_unique_time_period',
     ];
@@ -27,6 +28,7 @@ class BookingRule extends Model
             'monthly_limit' => 16,
             'reschedule_cutoff_hours' => 12,
             'reminder_hours_before' => 24,
+            'advance_booking_days' => 1,
             'enforce_one_booking_per_day' => true,
             'enforce_unique_time_period' => true,
         ]);

@@ -16,7 +16,8 @@ use Illuminate\Validation\ValidationException;
 class BookingController extends Controller
 {
     private array $activeStatuses = ['booked', 'rescheduled'];
-    private array $quotaStatuses = ['booked', 'rescheduled', 'completed'];
+    private array $weeklyQuotaStatuses = ['booked', 'rescheduled', 'completed'];
+    private array $monthlyQuotaStatuses = ['booked', 'rescheduled', 'completed', 'cancelled'];
 
     public function store(Request $request)
     {
@@ -172,7 +173,7 @@ class BookingController extends Controller
         $monthlyLimit = $this->effectiveMonthlyLimit($request->user(), $bookingRules);
 
         $weeklyUsed = Booking::where('user_id', $request->user()->id)
-            ->whereIn('status', $this->quotaStatuses)
+            ->whereIn('status', $this->weeklyQuotaStatuses)
             ->whereHas('slot', function ($query) use ($weekStart, $weekEnd) {
                 $query->whereBetween('date', [
                     $weekStart->toDateString(),
@@ -181,7 +182,7 @@ class BookingController extends Controller
             })
             ->count();
         $monthlyUsed = Booking::where('user_id', $request->user()->id)
-            ->whereIn('status', $this->quotaStatuses)
+            ->whereIn('status', $this->monthlyQuotaStatuses)
             ->whereHas('slot', function ($query) use ($monthStart, $monthEnd) {
                 $query->whereBetween('date', [
                     $monthStart->toDateString(),
@@ -326,8 +327,14 @@ class BookingController extends Controller
         [$weekStart, $weekEnd] = $this->monthWeekRange($slotDate);
         $monthlyLimit = $this->effectiveMonthlyLimit(request()->user(), $bookingRules, $slotDate);
 
+        if (!$this->slotIsInsideOpenBookingPeriod($slotDate, $bookingRules)) {
+            throw ValidationException::withMessages([
+                'limit' => 'Booking is not open for this weekly period yet.',
+            ]);
+        }
+
         $weeklyCount = Booking::where('user_id', $userId)
-            ->whereIn('status', $this->quotaStatuses)
+            ->whereIn('status', $this->weeklyQuotaStatuses)
             ->whereHas('slot', function ($query) use ($weekStart, $weekEnd) {
                 $query->whereBetween('date', [
                     $weekStart->toDateString(),
@@ -343,7 +350,7 @@ class BookingController extends Controller
         }
 
         $monthlyCount = Booking::where('user_id', $userId)
-            ->whereIn('status', $this->quotaStatuses)
+            ->whereIn('status', $this->monthlyQuotaStatuses)
             ->whereHas('slot', function ($query) use ($slotDate) {
                 $query->whereBetween('date', [
                     $slotDate->copy()->startOfMonth()->toDateString(),
@@ -398,6 +405,35 @@ class BookingController extends Controller
         };
 
         return min($bookingRules->monthly_limit, max(0, 4 - $bucketIndex) * $bookingRules->weekly_limit);
+    }
+
+    private function slotIsInsideOpenBookingPeriod(Carbon $slotDate, BookingRule $bookingRule): bool
+    {
+        [$currentStart, $currentEnd] = $this->monthWeekRange(now());
+
+        if ($slotDate->betweenIncluded($currentStart, $currentEnd)) {
+            return true;
+        }
+
+        if ((int) $bookingRule->advance_booking_days <= 0) {
+            return false;
+        }
+
+        $openNextFrom = $currentEnd->copy()->subDays($bookingRule->advance_booking_days - 1)->startOfDay();
+
+        if (now()->startOfDay()->lt($openNextFrom)) {
+            return false;
+        }
+
+        $nextStart = match ($currentStart->day) {
+            1 => $currentStart->copy()->day(8),
+            8 => $currentStart->copy()->day(15),
+            15 => $currentStart->copy()->day(22),
+            default => $currentStart->copy()->addMonthNoOverflow()->startOfMonth(),
+        };
+        [$nextPeriodStart, $nextPeriodEnd] = $this->monthWeekRange($nextStart);
+
+        return $slotDate->betweenIncluded($nextPeriodStart, $nextPeriodEnd);
     }
 
     private function refreshUserWarning($user): void

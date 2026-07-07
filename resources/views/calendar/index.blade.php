@@ -76,6 +76,10 @@
                             <div class="rounded-md bg-slate-100 px-3 py-4 text-center text-sm font-semibold text-slate-400">
                                 Finished
                             </div>
+                        @elseif(!$day['is_current_booking_period'])
+                            <div class="rounded-md bg-amber-50 px-3 py-4 text-center text-sm font-semibold text-amber-700">
+                                Opens in its week
+                            </div>
                         @elseif($day['slots']->isEmpty())
                             <div class="rounded-md bg-slate-50 px-3 py-4 text-center text-sm font-semibold text-slate-500">
                                 Not generated yet

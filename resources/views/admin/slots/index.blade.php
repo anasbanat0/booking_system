@@ -75,6 +75,12 @@
                                class="mt-1 block w-full rounded-md border-slate-300 text-sm shadow-sm focus:border-blue-500 focus:ring-blue-500">
                     </label>
 
+                    <label class="block">
+                        <span class="text-sm font-medium text-slate-700">Open next week before days</span>
+                        <input type="number" name="advance_booking_days" min="0" max="7" value="{{ old('advance_booking_days', $bookingRules->advance_booking_days) }}"
+                               class="mt-1 block w-full rounded-md border-slate-300 text-sm shadow-sm focus:border-blue-500 focus:ring-blue-500">
+                    </label>
+
                     <div class="space-y-3 md:col-span-4">
                         <label class="flex items-center gap-2">
                             <input type="checkbox" name="enforce_one_booking_per_day" value="1" @checked($bookingRules->enforce_one_booking_per_day)

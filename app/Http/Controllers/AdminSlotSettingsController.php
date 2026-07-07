@@ -45,6 +45,7 @@ class AdminSlotSettingsController extends Controller
             'monthly_limit' => ['required', 'integer', 'min:1', 'max:500'],
             'reschedule_cutoff_hours' => ['required', 'integer', 'min:1', 'max:168'],
             'reminder_hours_before' => ['required', 'integer', 'min:1', 'max:168'],
+            'advance_booking_days' => ['required', 'integer', 'min:0', 'max:7'],
             'enforce_one_booking_per_day' => ['nullable', 'boolean'],
             'enforce_unique_time_period' => ['nullable', 'boolean'],
         ]);
@@ -54,6 +55,7 @@ class AdminSlotSettingsController extends Controller
             'monthly_limit' => $validated['monthly_limit'],
             'reschedule_cutoff_hours' => $validated['reschedule_cutoff_hours'],
             'reminder_hours_before' => $validated['reminder_hours_before'],
+            'advance_booking_days' => $validated['advance_booking_days'],
             'enforce_one_booking_per_day' => $request->boolean('enforce_one_booking_per_day'),
             'enforce_unique_time_period' => $request->boolean('enforce_unique_time_period'),
         ]);
