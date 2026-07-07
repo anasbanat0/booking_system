@@ -38,7 +38,7 @@ return new class extends Migration
             $table->id();
             $table->string('uuid')->unique();
             $table->string('connection');
-            $table->string('queue');
+            $table->string('queue', 100);
             $table->longText('payload');
             $table->longText('exception');
             $table->timestamp('failed_at')->useCurrent();
