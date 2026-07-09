@@ -21,7 +21,7 @@
             <x-input-label for="profile_photo" :value="__('Profile photo')" />
             <div class="mt-2 flex items-center gap-4">
                 @if($user->profile_photo_path)
-                    <img src="{{ asset('storage/' . $user->profile_photo_path) }}" alt="{{ $user->name }}" class="h-16 w-16 rounded-full object-cover">
+                    <img src="{{ route('profile.photo', $user) }}" alt="{{ $user->name }}" class="h-16 w-16 rounded-full object-cover">
                 @else
                     <div class="flex h-16 w-16 items-center justify-center rounded-full bg-slate-100 text-lg font-bold text-slate-600">
                         {{ strtoupper(substr($user->name, 0, 1)) }}

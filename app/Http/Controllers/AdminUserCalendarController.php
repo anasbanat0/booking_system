@@ -16,13 +16,21 @@ class AdminUserCalendarController extends Controller
 {
     public function index(Request $request)
     {
-        $view = $request->input('view', 'day');
+        $view = in_array($request->input('view', 'day'), ['day', 'week', 'month'], true)
+            ? $request->input('view', 'day')
+            : 'day';
         $date = $request->filled('date') ? Carbon::parse($request->date) : now();
-        $startOfWeek = $request->filled('week') ? Carbon::parse($request->week)->startOfWeek() : $date->copy()->startOfWeek();
+        $startOfWeek = $request->filled('week')
+            ? Carbon::parse($request->week)->startOfWeek(Carbon::SATURDAY)
+            : $date->copy()->startOfWeek(Carbon::SATURDAY);
+        $monthStart = $date->copy()->startOfMonth();
+        $monthEnd = $date->copy()->endOfMonth();
 
-        $days = $view === 'day'
-            ? collect([$date->copy()])
-            : collect(range(0, 6))->map(fn ($day) => $startOfWeek->copy()->addDays($day));
+        $days = match ($view) {
+            'month' => collect(range(0, $monthStart->diffInDays($monthEnd)))->map(fn ($day) => $monthStart->copy()->addDays($day)),
+            'week' => collect(range(0, 6))->map(fn ($day) => $startOfWeek->copy()->addDays($day)),
+            default => collect([$date->copy()]),
+        };
 
         $locations = BookingLocation::orderBy('name')->get();
         $selectedLocationId = $request->user()->canManageAllBranches()
@@ -57,6 +65,8 @@ class AdminUserCalendarController extends Controller
 
             return $slot->date . '|' . $period;
         });
+        $slotsByDay = $slots->groupBy('date');
+        $periods = range(1, max(3, (int) $slotPeriodMap->max()));
 
         $statusCounts = Booking::selectRaw('status, count(*) as total')
             ->whereHas('slot', function ($query) use ($days) {
@@ -73,15 +83,25 @@ class AdminUserCalendarController extends Controller
 
         return view('admin.users.calendar', [
             'days' => $days,
-            'periods' => [1, 2, 3],
+            'periods' => $periods,
             'slotsByDayPeriod' => $slotsByDayPeriod,
+            'slotsByDay' => $slotsByDay,
             'statusCounts' => $statusCounts,
             'weekStart' => $startOfWeek,
-            'previousWeek' => $startOfWeek->copy()->subWeek()->toDateString(),
-            'nextWeek' => $startOfWeek->copy()->addWeek()->toDateString(),
+            'previousDate' => match ($view) {
+                'month' => $date->copy()->subMonthNoOverflow()->toDateString(),
+                'week' => $startOfWeek->copy()->subWeek()->toDateString(),
+                default => $date->copy()->subDay()->toDateString(),
+            },
+            'nextDate' => match ($view) {
+                'month' => $date->copy()->addMonthNoOverflow()->toDateString(),
+                'week' => $startOfWeek->copy()->addWeek()->toDateString(),
+                default => $date->copy()->addDay()->toDateString(),
+            },
             'statuses' => ['booked', 'rescheduled', 'completed', 'cancelled', 'no_show'],
             'view' => $view,
             'selectedDate' => $date,
+            'rangeEnd' => $view === 'month' ? $monthEnd : ($view === 'week' ? $startOfWeek->copy()->addDays(6) : $date),
             'locations' => $locations,
             'selectedLocationId' => $selectedLocationId,
         ]);

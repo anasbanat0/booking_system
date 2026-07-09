@@ -10,8 +10,10 @@ use App\Models\Slot;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Validation\ValidationException;
+use PDOException;
 
 class BookingController extends Controller
 {
@@ -27,7 +29,9 @@ class BookingController extends Controller
 
         $user = $request->user();
 
-        return DB::transaction(function () use ($request, $user) {
+        $email = null;
+
+        $response = $this->transactionWithReconnect(function () use ($request, $user, &$email) {
             $slot = Slot::lockForUpdate()->findOrFail($request->slot_id);
 
             $this->validateNewBooking($user->id, $slot);
@@ -40,7 +44,7 @@ class BookingController extends Controller
 
             $slot->increment('booked_count');
             $this->notifyAdmins($booking, 'booking_created', 'New booking', $user->name . ' booked ' . $slot->date . ' from ' . $slot->start_time . ' to ' . $slot->end_time . '.');
-            $this->emailUser($booking, 'Booking confirmed', 'Your booking is confirmed for ' . $slot->date . ' from ' . $slot->start_time . ' to ' . $slot->end_time . '.');
+            $email = $this->emailPayload($booking, 'Booking confirmed', 'Your booking is confirmed for ' . $slot->date . ' from ' . $slot->start_time . ' to ' . $slot->end_time . '.');
             ActivityLog::record('booking_created', 'Booking created', $user->name . ' created a booking.', [
                 'user_id' => $user->id,
                 'booking_id' => $booking->id,
@@ -49,6 +53,10 @@ class BookingController extends Controller
 
             return back()->with('success', 'Booking confirmed.');
         });
+
+        $this->sendEmailAfterResponse($email);
+
+        return $response;
     }
 
     public function reschedule(Request $request, Booking $booking)
@@ -59,7 +67,9 @@ class BookingController extends Controller
 
         abort_unless($booking->user_id === $request->user()->id, 403);
 
-        return DB::transaction(function () use ($request, $booking) {
+        $email = null;
+
+        $response = $this->transactionWithReconnect(function () use ($request, $booking, &$email) {
             $booking = Booking::with('slot')->lockForUpdate()->findOrFail($booking->id);
 
             if (!in_array($booking->status, $this->activeStatuses, true)) {
@@ -100,7 +110,7 @@ class BookingController extends Controller
                 'rescheduled_at' => now(),
             ]);
             $this->notifyAdmins($booking, 'booking_rescheduled', 'Booking rescheduled', $booking->user->name . ' rescheduled to ' . $newSlot->date . ' from ' . $newSlot->start_time . ' to ' . $newSlot->end_time . '.');
-            $this->emailUser($booking, 'Booking rescheduled', 'Your booking was rescheduled to ' . $newSlot->date . ' from ' . $newSlot->start_time . ' to ' . $newSlot->end_time . '.');
+            $email = $this->emailPayload($booking, 'Booking rescheduled', 'Your booking was rescheduled to ' . $newSlot->date . ' from ' . $newSlot->start_time . ' to ' . $newSlot->end_time . '.');
             ActivityLog::record('booking_rescheduled', 'Booking rescheduled', $booking->user->name . ' rescheduled a booking.', [
                 'user_id' => $booking->user_id,
                 'booking_id' => $booking->id,
@@ -109,13 +119,19 @@ class BookingController extends Controller
 
             return back()->with('success', 'Booking rescheduled successfully.');
         });
+
+        $this->sendEmailAfterResponse($email);
+
+        return $response;
     }
 
     public function cancel(Request $request, Booking $booking)
     {
         abort_unless($booking->user_id === $request->user()->id, 403);
 
-        return DB::transaction(function () use ($booking) {
+        $email = null;
+
+        $response = $this->transactionWithReconnect(function () use ($booking, &$email) {
             $booking = Booking::with('slot', 'user')->lockForUpdate()->findOrFail($booking->id);
 
             if (!in_array($booking->status, $this->activeStatuses, true)) {
@@ -134,7 +150,7 @@ class BookingController extends Controller
             $this->refreshUserWarning($booking->user);
             $bookingDate = $booking->slot?->date ?? 'an unavailable slot';
             $this->notifyAdmins($booking, 'booking_cancelled', 'Booking cancelled', $booking->user->name . ' cancelled a booking on ' . $bookingDate . '.');
-            $this->emailUser($booking, 'Booking cancelled', 'Your booking on ' . $bookingDate . ' has been cancelled.');
+            $email = $this->emailPayload($booking, 'Booking cancelled', 'Your booking on ' . $bookingDate . ' has been cancelled.');
             ActivityLog::record('booking_cancelled', 'Booking cancelled', $booking->user->name . ' cancelled a booking.', [
                 'user_id' => $booking->user_id,
                 'booking_id' => $booking->id,
@@ -142,6 +158,10 @@ class BookingController extends Controller
 
             return back()->with('success', 'Booking cancelled.');
         });
+
+        $this->sendEmailAfterResponse($email);
+
+        return $response;
     }
 
     public function myBookings(Request $request)
@@ -479,16 +499,65 @@ class BookingController extends Controller
         ]);
     }
 
-    private function emailUser(Booking $booking, string $subject, string $message): void
+    private function emailPayload(Booking $booking, string $subject, string $message): ?array
     {
         $booking->loadMissing('user');
 
         if (!$booking->user?->email) {
+            return null;
+        }
+
+        return [
+            'to' => $booking->user->email,
+            'subject' => $subject,
+            'message' => $message,
+        ];
+    }
+
+    private function sendEmailAfterResponse(?array $email): void
+    {
+        if (!$email) {
             return;
         }
 
-        Mail::raw($message, function ($mail) use ($booking, $subject) {
-            $mail->to($booking->user->email)->subject($subject);
+        app()->terminating(function () use ($email) {
+            try {
+                Mail::raw($email['message'], function ($mail) use ($email) {
+                    $mail->to($email['to'])->subject($email['subject']);
+                });
+            } catch (\Throwable $exception) {
+                Log::warning('Booking email failed after response.', [
+                    'to' => $email['to'],
+                    'subject' => $email['subject'],
+                    'exception' => $exception->getMessage(),
+                ]);
+            }
         });
+    }
+
+    private function transactionWithReconnect(callable $callback)
+    {
+        $callbackStarted = false;
+
+        try {
+            return DB::transaction(function () use ($callback, &$callbackStarted) {
+                $callbackStarted = true;
+
+                return $callback();
+            }, 3);
+        } catch (PDOException $exception) {
+            if ($callbackStarted || !$this->isMysqlGoneAway($exception)) {
+                throw $exception;
+            }
+
+            DB::purge();
+
+            return DB::transaction($callback, 1);
+        }
+    }
+
+    private function isMysqlGoneAway(PDOException $exception): bool
+    {
+        return str_contains($exception->getMessage(), '2006 MySQL server has gone away');
     }
 }

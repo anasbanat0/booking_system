@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Http\Requests\ProfileUpdateRequest;
 use App\Models\ActivityLog;
+use App\Models\User;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -21,6 +22,14 @@ class ProfileController extends Controller
         return view('profile.edit', [
             'user' => $request->user(),
         ]);
+    }
+
+    public function photo(Request $request, User $user)
+    {
+        abort_unless($request->user()->id === $user->id || $request->user()->isAdminPanelUser(), 403);
+        abort_unless($user->profile_photo_path && Storage::disk('public')->exists($user->profile_photo_path), 404);
+
+        return Storage::disk('public')->response($user->profile_photo_path);
     }
 
     /**

@@ -9,9 +9,11 @@ use App\Models\Slot;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
+use PDOException;
 
 class AdminBookingController extends Controller
 {
@@ -91,7 +93,9 @@ class AdminBookingController extends Controller
             'slot_id' => ['required', 'exists:slots,id'],
         ]);
 
-        $booking = DB::transaction(function () use ($request, $validated) {
+        $email = null;
+
+        $booking = $this->transactionWithReconnect(function () use ($request, $validated, &$email) {
             $slot = Slot::lockForUpdate()->findOrFail($validated['slot_id']);
             $user = User::findOrFail($validated['user_id']);
 
@@ -139,12 +143,16 @@ class AdminBookingController extends Controller
                 'properties' => ['slot_id' => $slot->id],
             ]);
 
-            Mail::raw('A booking was created for you on ' . $slot->date . ' from ' . $slot->start_time . ' to ' . $slot->end_time . '.', function ($mail) use ($user) {
-                $mail->to($user->email)->subject('Booking created');
-            });
+            $email = [
+                'to' => $user->email,
+                'subject' => 'Booking created',
+                'message' => 'A booking was created for you on ' . $slot->date . ' from ' . $slot->start_time . ' to ' . $slot->end_time . '.',
+            ];
 
             return $booking;
         });
+
+        $this->sendEmailAfterResponse($email);
 
         return back()->with('success', 'Manual booking #' . $booking->id . ' created successfully.');
     }
@@ -155,7 +163,7 @@ class AdminBookingController extends Controller
             'status' => ['required', Rule::in(['booked', 'completed', 'no_show', 'cancelled', 'rescheduled'])],
         ]);
 
-        $booking = DB::transaction(function () use ($id, $validated) {
+        $booking = $this->transactionWithReconnect(function () use ($id, $validated) {
             $booking = Booking::with(['slot', 'user'])->lockForUpdate()->findOrFail($id);
             $slot = $booking->slot()->lockForUpdate()->firstOrFail();
 
@@ -239,5 +247,52 @@ class AdminBookingController extends Controller
             'booking_warning_reason' => implode(' and ', $reasons),
             'booking_warning_at' => now(),
         ]);
+    }
+
+    private function sendEmailAfterResponse(?array $email): void
+    {
+        if (!$email) {
+            return;
+        }
+
+        app()->terminating(function () use ($email) {
+            try {
+                Mail::raw($email['message'], function ($mail) use ($email) {
+                    $mail->to($email['to'])->subject($email['subject']);
+                });
+            } catch (\Throwable $exception) {
+                Log::warning('Booking email failed after response.', [
+                    'to' => $email['to'],
+                    'subject' => $email['subject'],
+                    'exception' => $exception->getMessage(),
+                ]);
+            }
+        });
+    }
+
+    private function transactionWithReconnect(callable $callback)
+    {
+        $callbackStarted = false;
+
+        try {
+            return DB::transaction(function () use ($callback, &$callbackStarted) {
+                $callbackStarted = true;
+
+                return $callback();
+            }, 3);
+        } catch (PDOException $exception) {
+            if ($callbackStarted || !$this->isMysqlGoneAway($exception)) {
+                throw $exception;
+            }
+
+            DB::purge();
+
+            return DB::transaction($callback, 1);
+        }
+    }
+
+    private function isMysqlGoneAway(PDOException $exception): bool
+    {
+        return str_contains($exception->getMessage(), '2006 MySQL server has gone away');
     }
 }

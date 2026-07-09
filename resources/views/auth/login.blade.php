@@ -3,8 +3,8 @@
     $portalConfig = [
         'student' => [
             'label' => 'Student Portal',
-            'title' => 'Book your weekly appointment',
-            'copy' => 'Sign in to view the weekly calendar, reserve a seat, and manage your bookings.',
+            'title' => 'Reserve your Medical Hub seat',
+            'copy' => 'Sign in to book a quiet weekly seat with reliable power and internet for study or online exams.',
             'accent' => 'text-teal-700',
         ],
         'staff' => [

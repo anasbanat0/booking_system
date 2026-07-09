@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\User;
 use App\Models\Booking;
+use App\Models\BookingLocation;
 use App\Models\Slot;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
@@ -13,71 +14,98 @@ class AdminController extends Controller
 {
     public function index(Request $request)
     {
-        $locationId = $request->user()->canManageAllBranches() ? null : $request->user()->booking_location_id;
+        $locations = BookingLocation::orderBy('name')->get();
+        $selectedLocationId = $request->user()->canManageAllBranches()
+            ? $request->integer('location_id') ?: null
+            : $request->user()->booking_location_id;
+        $period = in_array($request->input('period'), ['today', 'week', 'month', 'custom'], true)
+            ? $request->input('period')
+            : 'week';
 
-        $totalUsers = User::count();
+        $startDate = $request->filled('start_date')
+            ? Carbon::parse($request->start_date)->startOfDay()
+            : now()->copy()->startOfWeek(Carbon::SATURDAY)->startOfDay();
+        $endDate = $request->filled('end_date')
+            ? Carbon::parse($request->end_date)->endOfDay()
+            : now()->copy()->endOfWeek(Carbon::FRIDAY)->endOfDay();
 
-        $totalBookings = Booking::when($locationId, function ($query) use ($locationId) {
-            $query->whereHas('slot', fn ($slotQuery) => $slotQuery->where('booking_location_id', $locationId));
-        })->count();
+        if ($period !== 'custom') {
+            [$startDate, $endDate] = match ($period) {
+                'today' => [now()->startOfDay(), now()->endOfDay()],
+                'month' => [now()->startOfMonth()->startOfDay(), now()->endOfMonth()->endOfDay()],
+                default => [now()->copy()->startOfWeek(Carbon::SATURDAY)->startOfDay(), now()->copy()->endOfWeek(Carbon::FRIDAY)->endOfDay()],
+            };
+        }
 
-        $todayBookings = Booking::whereDate('created_at', Carbon::today())
-            ->when($locationId, function ($query) use ($locationId) {
-                $query->whereHas('slot', fn ($slotQuery) => $slotQuery->where('booking_location_id', $locationId));
-            })
+        if ($startDate->gt($endDate)) {
+            [$startDate, $endDate] = [$endDate->copy()->startOfDay(), $startDate->copy()->endOfDay()];
+        }
+
+        $totalUsers = User::where('role', 'student')
+            ->when($selectedLocationId, fn ($query) => $query->where('booking_location_id', $selectedLocationId))
+            ->count();
+
+        $bookingScope = function ($query) use ($selectedLocationId, $startDate, $endDate) {
+            $query->whereHas('slot', function ($slotQuery) use ($selectedLocationId, $startDate, $endDate) {
+                $slotQuery->whereBetween('date', [$startDate->toDateString(), $endDate->toDateString()])
+                    ->when($selectedLocationId, fn ($branchQuery) => $branchQuery->where('booking_location_id', $selectedLocationId));
+            });
+        };
+
+        $totalBookings = Booking::where($bookingScope)->count();
+
+        $todayBookings = Booking::where($bookingScope)
+            ->whereHas('slot', fn ($slotQuery) => $slotQuery->whereDate('date', Carbon::today()))
             ->count();
 
         $cancelledBookings = Booking::where('status', 'cancelled')
-            ->when($locationId, function ($query) use ($locationId) {
-                $query->whereHas('slot', fn ($slotQuery) => $slotQuery->where('booking_location_id', $locationId));
-            })
+            ->where($bookingScope)
             ->count();
 
         $activeSlots = Slot::where('is_active', true)
-            ->when($locationId, fn ($query) => $query->where('booking_location_id', $locationId))
+            ->whereBetween('date', [$startDate->toDateString(), $endDate->toDateString()])
+            ->when($selectedLocationId, fn ($query) => $query->where('booking_location_id', $selectedLocationId))
             ->count();
 
-        $upcomingBookings = Booking::whereHas('slot', function ($query) {
-            $query->whereDate('date', '>=', Carbon::today());
-        })->where('status', 'booked')
-            ->when($locationId, function ($query) use ($locationId) {
-                $query->whereHas('slot', fn ($slotQuery) => $slotQuery->where('booking_location_id', $locationId));
+        $upcomingBookings = Booking::whereIn('status', ['booked', 'rescheduled'])
+            ->whereHas('slot', function ($query) use ($selectedLocationId) {
+                $query->whereDate('date', '>=', Carbon::today())
+                    ->when($selectedLocationId, fn ($branchQuery) => $branchQuery->where('booking_location_id', $selectedLocationId));
             })
             ->count();
 
         $latestBookings = Booking::with(['user', 'slot.location'])
-            ->when($locationId, function ($query) use ($locationId) {
-                $query->whereHas('slot', fn ($slotQuery) => $slotQuery->where('booking_location_id', $locationId));
-            })
+            ->where($bookingScope)
             ->latest()
             ->take(10)
             ->get();
 
         $bookingsPerDay = Booking::select(
-            DB::raw('DATE(created_at) as date'),
+            DB::raw('slots.date as date'),
             DB::raw('count(*) as total')
         )
-        ->when($locationId, function ($query) use ($locationId) {
-            $query->whereHas('slot', fn ($slotQuery) => $slotQuery->where('booking_location_id', $locationId));
+        ->join('slots', 'slots.id', '=', 'bookings.slot_id')
+        ->whereBetween('slots.date', [$startDate->toDateString(), $endDate->toDateString()])
+        ->when($selectedLocationId, function ($query) use ($selectedLocationId) {
+            $query->where('slots.booking_location_id', $selectedLocationId);
         })
-        ->where('created_at', '>=', Carbon::now()->subDays(7))
-        ->groupBy('date')
-        ->orderBy('date')
+        ->groupBy('slots.date')
+        ->orderBy('slots.date')
         ->get();
 
         $statusCounts = Booking::select('status', DB::raw('count(*) as total'))
-        ->when($locationId, function ($query) use ($locationId) {
-            $query->whereHas('slot', fn ($slotQuery) => $slotQuery->where('booking_location_id', $locationId));
-        })
+        ->where($bookingScope)
         ->groupBy('status')
         ->get();
 
         $peakHours = Booking::select(
-            DB::raw('HOUR(created_at) as hour'),
+            DB::raw('HOUR(slots.start_time) as hour'),
             DB::raw('count(*) as total')
         )
-        ->when($locationId, function ($query) use ($locationId) {
-            $query->whereHas('slot', fn ($slotQuery) => $slotQuery->where('booking_location_id', $locationId));
+        ->join('slots', 'slots.id', '=', 'bookings.slot_id')
+        ->whereBetween('slots.date', [$startDate->toDateString(), $endDate->toDateString()])
+        ->when($selectedLocationId, function ($query) use ($selectedLocationId) {
+            $query->where('slots.booking_location_id', $selectedLocationId);
         })
         ->groupBy('hour')
         ->orderBy('hour')
@@ -93,7 +121,12 @@ class AdminController extends Controller
             'latestBookings',
             'bookingsPerDay',
             'statusCounts',
-            'peakHours'
+            'peakHours',
+            'locations',
+            'selectedLocationId',
+            'startDate',
+            'endDate',
+            'period'
         ));
     }
 }

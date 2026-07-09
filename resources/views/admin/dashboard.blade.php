@@ -46,21 +46,56 @@
                     Track booking activity, slot availability, and recent customer movement from one focused screen.
                 </p>
             </div>
+
+            <form method="GET" class="mt-5 grid gap-3 border-y border-slate-200 bg-white/70 py-4 sm:grid-cols-2 xl:grid-cols-[auto_160px_160px_220px_auto] xl:items-end">
+                    <div>
+                        <span class="text-xs font-bold uppercase tracking-wide text-slate-500">Range</span>
+                        <div class="mt-1 grid grid-cols-3 overflow-hidden rounded-md border border-slate-300 bg-white text-sm font-bold">
+                            <button type="submit" name="period" value="today" class="px-3 py-2 {{ $period === 'today' ? 'bg-slate-950 text-white' : 'text-slate-600 hover:bg-slate-50' }}">Today</button>
+                            <button type="submit" name="period" value="week" class="border-x border-slate-300 px-3 py-2 {{ $period === 'week' ? 'bg-slate-950 text-white' : 'text-slate-600 hover:bg-slate-50' }}">Week</button>
+                            <button type="submit" name="period" value="month" class="px-3 py-2 {{ $period === 'month' ? 'bg-slate-950 text-white' : 'text-slate-600 hover:bg-slate-50' }}">Month</button>
+                        </div>
+                    </div>
+                    <label class="block">
+                        <span class="text-xs font-bold uppercase tracking-wide text-slate-500">From</span>
+                        <input type="date" name="start_date" value="{{ $startDate->toDateString() }}" class="mt-1 block w-full rounded-md border-slate-300 text-sm">
+                    </label>
+                    <label class="block">
+                        <span class="text-xs font-bold uppercase tracking-wide text-slate-500">To</span>
+                        <input type="date" name="end_date" value="{{ $endDate->toDateString() }}" class="mt-1 block w-full rounded-md border-slate-300 text-sm">
+                    </label>
+                    @if(Auth::user()?->canManageAllBranches())
+                        <label class="block">
+                            <span class="text-xs font-bold uppercase tracking-wide text-slate-500">Branch</span>
+                            <select name="location_id" class="mt-1 block w-full rounded-md border-slate-300 text-sm">
+                                <option value="">All branches</option>
+                                @foreach($locations as $location)
+                                    <option value="{{ $location->id }}" @selected((int) $selectedLocationId === (int) $location->id)>{{ $location->name }}</option>
+                                @endforeach
+                            </select>
+                        </label>
+                    @else
+                        <div class="rounded-md bg-slate-50 px-3 py-2 text-sm font-bold text-slate-600">
+                            Branch: {{ Auth::user()?->managedLocation?->name ?? 'Not assigned' }}
+                        </div>
+                    @endif
+                    <button name="period" value="custom" class="rounded-md bg-slate-950 px-4 py-2 text-sm font-bold text-white hover:bg-slate-800">Apply</button>
+                </form>
         </div>
 
         <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-5">
             <div class="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
-                <p class="text-sm font-medium text-slate-500">Total Users</p>
+                <p class="text-sm font-medium text-slate-500">Students</p>
                 <p class="mt-3 text-3xl font-bold text-slate-950">{{ number_format($totalUsers) }}</p>
             </div>
 
             <div class="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
-                <p class="text-sm font-medium text-slate-500">Total Bookings</p>
+                <p class="text-sm font-medium text-slate-500">Bookings in Range</p>
                 <p class="mt-3 text-3xl font-bold text-slate-950">{{ number_format($totalBookings) }}</p>
             </div>
 
             <div class="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
-                <p class="text-sm font-medium text-slate-500">Today</p>
+                <p class="text-sm font-medium text-slate-500">Today Bookings</p>
                 <p class="mt-3 text-3xl font-bold text-blue-700">{{ number_format($todayBookings) }}</p>
             </div>
 
@@ -80,7 +115,7 @@
                 <div class="flex items-center justify-between border-b border-slate-200 px-5 py-4">
                     <div>
                         <h2 class="text-base font-semibold text-slate-950">Bookings Trend</h2>
-                        <p class="mt-1 text-sm text-slate-500">Last 7 days</p>
+                        <p class="mt-1 text-sm text-slate-500">{{ $startDate->format('M d, Y') }} - {{ $endDate->format('M d, Y') }}</p>
                     </div>
                 </div>
                 <div class="h-80 p-5">
@@ -91,7 +126,7 @@
             <section class="rounded-lg border border-slate-200 bg-white shadow-sm">
                 <div class="border-b border-slate-200 px-5 py-4">
                     <h2 class="text-base font-semibold text-slate-950">Status Mix</h2>
-                    <p class="mt-1 text-sm text-slate-500">Current booking distribution</p>
+                    <p class="mt-1 text-sm text-slate-500">Filtered booking distribution</p>
                 </div>
                 <div class="h-80 p-5">
                     <canvas id="statusChart"></canvas>
@@ -160,7 +195,7 @@
             <section class="rounded-lg border border-slate-200 bg-white shadow-sm">
                 <div class="border-b border-slate-200 px-5 py-4">
                     <h2 class="text-base font-semibold text-slate-950">Peak Hours</h2>
-                    <p class="mt-1 text-sm text-slate-500">When bookings are created most often.</p>
+                    <p class="mt-1 text-sm text-slate-500">Most common booked slot start times.</p>
                 </div>
                 <div class="h-80 p-5">
                     <canvas id="hoursChart"></canvas>

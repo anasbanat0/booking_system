@@ -3,11 +3,11 @@
 @section('content')
 @php
     $statusStyles = [
-        'booked' => 'bg-sky-100 text-sky-800 ring-sky-200',
-        'rescheduled' => 'bg-violet-100 text-violet-800 ring-violet-200',
-        'completed' => 'bg-emerald-100 text-emerald-800 ring-emerald-200',
-        'cancelled' => 'bg-rose-100 text-rose-800 ring-rose-200',
-        'no_show' => 'bg-amber-100 text-amber-900 ring-amber-200',
+        'booked' => 'background-color: #16a34a; color: #ffffff; border-color: #15803d;',
+        'rescheduled' => 'background-color: #7c3aed; color: #ffffff; border-color: #6d28d9;',
+        'completed' => 'background-color: #2563eb; color: #ffffff; border-color: #1d4ed8;',
+        'cancelled' => 'background-color: #dc2626; color: #ffffff; border-color: #b91c1c;',
+        'no_show' => 'background-color: #facc15; color: #111827; border-color: #eab308;',
     ];
 
     $periodLabels = [
@@ -15,6 +15,12 @@
         2 => 'Second period',
         3 => 'Third period',
     ];
+    $gridColumns = $view === 'day'
+        ? '170px minmax(0, 1fr)'
+        : '170px repeat(' . $days->count() . ', minmax(150px, 1fr))';
+    $minWidth = $view === 'day'
+        ? '760px'
+        : (170 + ($days->count() * 150)) . 'px';
 @endphp
 
 <div class="min-h-screen bg-slate-50 lg:flex">
@@ -34,15 +40,15 @@
                 </div>
 
                 <div class="flex flex-col gap-2 sm:flex-row">
-                    <a href="{{ route('admin.users-calendar.index', ['week' => $previousWeek, 'view' => 'week', 'location_id' => $selectedLocationId]) }}"
+                    <a href="{{ route('admin.users-calendar.index', ['date' => $previousDate, 'view' => $view, 'location_id' => $selectedLocationId]) }}"
                        class="rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-bold text-slate-700 hover:bg-slate-100">
                         Previous
                     </a>
-                    <a href="{{ route('admin.users-calendar.index', ['location_id' => $selectedLocationId]) }}"
+                    <a href="{{ route('admin.users-calendar.index', ['view' => $view, 'location_id' => $selectedLocationId]) }}"
                        class="rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-bold text-slate-700 hover:bg-slate-100">
-                        This week
+                        Today
                     </a>
-                    <a href="{{ route('admin.users-calendar.index', ['week' => $nextWeek, 'view' => 'week', 'location_id' => $selectedLocationId]) }}"
+                    <a href="{{ route('admin.users-calendar.index', ['date' => $nextDate, 'view' => $view, 'location_id' => $selectedLocationId]) }}"
                        class="rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-bold text-slate-700 hover:bg-slate-100">
                         Next
                     </a>
@@ -74,6 +80,7 @@
                         <select name="view" class="mt-1 block w-full rounded-md border-slate-300 text-sm">
                             <option value="week" @selected($view === 'week')>Weekly</option>
                             <option value="day" @selected($view === 'day')>Daily</option>
+                            <option value="month" @selected($view === 'month')>Monthly</option>
                         </select>
                     </label>
                     <label class="block">
@@ -86,7 +93,7 @@
                             <select name="location_id" class="mt-1 block w-full rounded-md border-slate-300 text-sm">
                                 <option value="">All branches</option>
                                 @foreach($locations as $location)
-                                    <option value="{{ $location->id }}" @selected($selectedLocationId === $location->id)>{{ $location->name }}</option>
+                                    <option value="{{ $location->id }}" @selected((int) $selectedLocationId === (int) $location->id)>{{ $location->name }}</option>
                                 @endforeach
                             </select>
                         </label>
@@ -103,7 +110,10 @@
                 <div class="grid grid-cols-2 gap-3 md:grid-cols-5">
                     @foreach(['booked', 'rescheduled', 'completed', 'cancelled', 'no_show'] as $status)
                         <div class="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
-                            <p class="text-xs font-bold uppercase tracking-wide text-slate-500">{{ str_replace('_', ' ', $status) }}</p>
+                            <div class="flex items-center gap-2">
+                                <span class="h-3 w-3 rounded-full border" style="{{ $statusStyles[$status] }}"></span>
+                                <p class="text-xs font-bold uppercase tracking-wide text-slate-500">{{ str_replace('_', ' ', $status) }}</p>
+                            </div>
                             <p class="mt-2 text-2xl font-extrabold text-slate-950">{{ number_format($statusCounts[$status] ?? 0) }}</p>
                         </div>
                     @endforeach
@@ -111,11 +121,138 @@
 
             </div>
 
+            @if(false && $view === 'month')
             <section class="overflow-x-auto rounded-lg border border-slate-200 bg-white shadow-sm">
-                <div class="{{ $view === 'day' ? 'min-w-[760px]' : 'min-w-[1180px]' }}">
-                    <div class="grid {{ $view === 'day' ? 'grid-cols-[170px_minmax(0,1fr)]' : 'grid-cols-[170px_repeat(7,minmax(0,1fr))]' }} border-b border-slate-200 bg-slate-100">
+                <div class="min-w-[1180px]">
+                    <div class="grid grid-cols-7 border-b border-slate-200 bg-slate-100">
+                        @foreach(['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'] as $weekday)
+                            <div class="border-s border-slate-200 px-4 py-3 first:border-s-0">
+                                <p class="text-center text-xs font-extrabold uppercase tracking-wide text-slate-500">{{ $weekday }}</p>
+                            </div>
+                        @endforeach
+                    </div>
+
+                    @foreach($calendarWeeks as $week)
+                        <div class="grid min-h-48 grid-cols-7 border-b border-slate-200 last:border-b-0">
+                            @foreach($week as $day)
+                                @php
+                                    $daySlots = $slotsByDay->get($day->toDateString(), collect());
+                                    $isCurrentMonth = $day->isSameMonth($selectedDate);
+                                @endphp
+                                <div class="border-s border-slate-200 p-3 first:border-s-0 {{ $isCurrentMonth ? 'bg-white' : 'bg-slate-50' }}">
+                                    <div class="mb-2 flex items-center justify-between gap-2">
+                                        <p class="text-sm font-extrabold {{ $day->isToday() ? 'text-blue-700' : ($isCurrentMonth ? 'text-slate-950' : 'text-slate-400') }}">
+                                            {{ $day->format('d') }}
+                                        </p>
+                                        <p class="text-[11px] font-bold text-slate-400">{{ $daySlots->sum(fn ($slot) => $slot->bookings->count()) }} bookings</p>
+                                    </div>
+
+                                    <div class="space-y-2">
+                                        @forelse($daySlots as $slot)
+                                            @if($slot->bookings->isNotEmpty())
+                                                <div>
+                                                    <div class="mb-1 flex items-center justify-between gap-2 text-[11px] font-bold text-slate-500">
+                                                        <span class="truncate">{{ $slot->location?->name }}</span>
+                                                        <span class="shrink-0">{{ substr($slot->start_time, 0, 5) }}</span>
+                                                    </div>
+                                                    <div class="flex flex-wrap gap-1">
+                                                        @foreach($slot->bookings as $booking)
+                                                            <button type="button"
+                                                                    x-data
+                                                                    @click="$dispatch('open-booking-modal', { id: 'booking-{{ $booking->id }}' })"
+                                                                    class="max-w-full rounded-md px-2 py-1 text-left text-[11px] font-bold ring-1 ring-inset {{ $statusStyles[$booking->status] ?? 'bg-slate-600 text-white ring-slate-700' }}">
+                                                                <span class="block max-w-28 truncate">{{ $booking->user?->name ?? 'Deleted user' }}</span>
+                                                            </button>
+
+                                                            <div x-data="{ open: false }"
+                                                                 x-on:open-booking-modal.window="open = ($event.detail.id === 'booking-{{ $booking->id }}')"
+                                                                 x-show="open"
+                                                                 x-cloak
+                                                                 class="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/55 px-4">
+                                                                <div @click.outside="open = false" class="w-full max-w-xl rounded-lg bg-white shadow-2xl">
+                                                                    <form method="POST" action="{{ route('admin.users-calendar.bookings.update', $booking) }}">
+                                                                        @csrf
+                                                                        @method('PATCH')
+
+                                                                        <div class="border-b border-slate-200 px-5 py-4">
+                                                                            <div class="flex items-start justify-between gap-3">
+                                                                                <div>
+                                                                                    <p class="text-sm font-bold uppercase tracking-wide text-blue-700">Booking details</p>
+                                                                                    <h2 class="mt-1 text-2xl font-extrabold text-slate-950">{{ $booking->user?->name }}</h2>
+                                                                                    <p class="mt-1 text-sm text-slate-500">
+                                                                                        {{ $slot->location?->name }} | {{ $slot->date }} | {{ substr($slot->start_time, 0, 5) }} - {{ substr($slot->end_time, 0, 5) }}
+                                                                                    </p>
+                                                                                </div>
+                                                                                <button type="button" @click="open = false" class="rounded-md p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-700">
+                                                                                    X
+                                                                                </button>
+                                                                            </div>
+                                                                        </div>
+
+                                                                        <div class="grid gap-4 p-5 sm:grid-cols-2">
+                                                                            <label class="block">
+                                                                                <span class="text-sm font-semibold text-slate-700">Name</span>
+                                                                                <input name="name" value="{{ $booking->user?->name }}"
+                                                                                       class="mt-1 block w-full rounded-md border-slate-300 text-sm shadow-sm focus:border-blue-500 focus:ring-blue-500">
+                                                                            </label>
+
+                                                                            <label class="block">
+                                                                                <span class="text-sm font-semibold text-slate-700">Email</span>
+                                                                                <input type="email" name="email" value="{{ $booking->user?->email }}"
+                                                                                       class="mt-1 block w-full rounded-md border-slate-300 text-sm shadow-sm focus:border-blue-500 focus:ring-blue-500">
+                                                                            </label>
+
+                                                                            <label class="block">
+                                                                                <span class="text-sm font-semibold text-slate-700">Phone</span>
+                                                                                <input name="phone" value="{{ $booking->user?->phone }}"
+                                                                                       class="mt-1 block w-full rounded-md border-slate-300 text-sm shadow-sm focus:border-blue-500 focus:ring-blue-500">
+                                                                            </label>
+
+                                                                            <label class="block">
+                                                                                <span class="text-sm font-semibold text-slate-700">Status / Attendance</span>
+                                                                                <select name="status" class="mt-1 block w-full rounded-md border-slate-300 text-sm shadow-sm focus:border-blue-500 focus:ring-blue-500">
+                                                                                    @foreach($statuses as $status)
+                                                                                        <option value="{{ $status }}" @selected($booking->status === $status)>
+                                                                                            {{ ucwords(str_replace('_', ' ', $status)) }}
+                                                                                        </option>
+                                                                                    @endforeach
+                                                                                </select>
+                                                                            </label>
+                                                                        </div>
+
+                                                                        <div class="flex justify-end gap-2 border-t border-slate-200 px-5 py-4">
+                                                                            <button type="button" @click="open = false" class="rounded-md border border-slate-300 px-4 py-2 text-sm font-bold text-slate-700 hover:bg-slate-100">
+                                                                                Close
+                                                                            </button>
+                                                                            <button class="rounded-md bg-slate-950 px-4 py-2 text-sm font-bold text-white hover:bg-slate-800">
+                                                                                Save changes
+                                                                            </button>
+                                                                        </div>
+                                                                    </form>
+                                                                </div>
+                                                            </div>
+                                                        @endforeach
+                                                    </div>
+                                                </div>
+                                            @endif
+                                        @empty
+                                            <div class="flex min-h-24 items-center justify-center rounded-md border border-dashed border-slate-200 text-xs font-semibold text-slate-400">
+                                                No slot
+                                            </div>
+                                        @endforelse
+                                    </div>
+                                </div>
+                            @endforeach
+                        </div>
+                    @endforeach
+                </div>
+            </section>
+            @else
+            <section class="overflow-x-auto rounded-lg border border-slate-200 bg-white shadow-sm">
+                <div style="min-width: {{ $minWidth }};">
+                    <div class="grid border-b border-slate-200 bg-slate-100" style="grid-template-columns: {{ $gridColumns }};">
                         <div class="px-4 py-4 text-sm font-extrabold text-slate-700">
-                            {{ $weekStart->format('M d') }} - {{ $weekStart->copy()->endOfWeek()->format('M d, Y') }}
+                            {{ $view === 'day' ? $selectedDate->format('M d, Y') : $days->first()->format('M d') . ' - ' . $rangeEnd->format('M d, Y') }}
                         </div>
                         @foreach($days as $day)
                             <div class="border-s border-slate-200 px-4 py-4 text-center">
@@ -126,9 +263,9 @@
                     </div>
 
                     @foreach($periods as $period)
-                        <div class="grid min-h-44 {{ $view === 'day' ? 'grid-cols-[170px_minmax(0,1fr)]' : 'grid-cols-[170px_repeat(7,minmax(0,1fr))]' }} border-b border-slate-200 last:border-b-0">
+                        <div class="grid min-h-44 border-b border-slate-200 last:border-b-0" style="grid-template-columns: {{ $gridColumns }};">
                             <div class="bg-slate-50 px-4 py-4">
-                                <p class="text-sm font-extrabold text-slate-950">{{ $periodLabels[$period] }}</p>
+                                <p class="text-sm font-extrabold text-slate-950">{{ $periodLabels[$period] ?? 'Period ' . $period }}</p>
                                 <p class="mt-1 text-xs text-slate-500">Period {{ $period }}</p>
                             </div>
 
@@ -152,7 +289,8 @@
                                                     <button type="button"
                                                             x-data
                                                             @click="$dispatch('open-booking-modal', { id: 'booking-{{ $booking->id }}' })"
-                                                            class="max-w-full rounded-md px-2.5 py-1 text-left text-xs font-bold ring-1 ring-inset transition hover:scale-[1.02] {{ $statusStyles[$booking->status] ?? 'bg-slate-100 text-slate-700 ring-slate-200' }}">
+                                                            class="max-w-full rounded-md border px-2.5 py-1 text-left text-xs font-bold transition hover:scale-[1.02]"
+                                                            style="{{ $statusStyles[$booking->status] ?? 'background-color: #475569; color: #ffffff; border-color: #334155;' }}">
                                                         <span class="block truncate">{{ $booking->user?->name ?? 'Deleted user' }}</span>
                                                     </button>
 
@@ -241,6 +379,7 @@
                     @endforeach
                 </div>
             </section>
+            @endif
         </div>
     </main>
 </div>
