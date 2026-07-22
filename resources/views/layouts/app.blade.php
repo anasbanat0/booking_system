@@ -7,6 +7,17 @@
 
         <title>{{ config('app.name', 'Laravel') }}</title>
 
+        <script>
+            (() => {
+                const storedTheme = localStorage.getItem('theme');
+                const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+                const useDark = storedTheme ? storedTheme === 'dark' : prefersDark;
+
+                document.documentElement.classList.toggle('dark', useDark);
+                document.documentElement.style.colorScheme = useDark ? 'dark' : 'light';
+            })();
+        </script>
+
         <!-- Fonts -->
         <link rel="preconnect" href="https://fonts.bunny.net">
         <link href="https://fonts.bunny.net/css?family=figtree:400,500,600&display=swap" rel="stylesheet" />
@@ -15,6 +26,8 @@
         @vite(['resources/css/app.css', 'resources/js/app.js'])
     </head>
     <body class="font-sans antialiased">
+        <x-toast-notifications />
+
         <div class="min-h-screen bg-gray-100">
             @include('layouts.navigation')
 

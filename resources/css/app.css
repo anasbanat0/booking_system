@@ -5,3 +5,204 @@
 [x-cloak] {
     display: none !important;
 }
+
+@layer base {
+    html {
+        background: #f8fafc;
+    }
+
+    html.dark {
+        background: #020617;
+    }
+
+    html.dark body {
+        background: radial-gradient(circle at top left, rgba(14, 165, 233, 0.12), transparent 32rem), #020617;
+        color: #e2e8f0;
+    }
+
+    html.dark input,
+    html.dark select,
+    html.dark textarea {
+        background-color: #0f172a;
+        border-color: #334155;
+        color: #e2e8f0;
+    }
+
+    html.dark input::placeholder,
+    html.dark textarea::placeholder {
+        color: #64748b;
+    }
+
+    html.dark input[type="date"]::-webkit-calendar-picker-indicator {
+        filter: invert(1);
+        opacity: 0.75;
+    }
+}
+
+@layer utilities {
+    html.dark .bg-white,
+    html.dark .bg-white\/95,
+    html.dark .bg-white\/85,
+    html.dark .bg-white\/80,
+    html.dark .bg-white\/70 {
+        background-color: rgb(15 23 42 / 0.94) !important;
+    }
+
+    html.dark .bg-gray-100,
+    html.dark .bg-gray-50,
+    html.dark .bg-slate-50,
+    html.dark .bg-slate-100,
+    html.dark .bg-stone-50,
+    html.dark .bg-stone-100,
+    html.dark [class*="bg-[#eef2f0]"],
+    html.dark [class*="bg-[#f6f7f4]"] {
+        background-color: #020617 !important;
+    }
+
+    html.dark .bg-slate-200,
+    html.dark .bg-stone-200,
+    html.dark .bg-gray-200 {
+        background-color: #1e293b !important;
+    }
+
+    html.dark .text-slate-950,
+    html.dark .text-slate-900,
+    html.dark .text-stone-950,
+    html.dark .text-stone-900,
+    html.dark .text-gray-900,
+    html.dark .text-gray-800 {
+        color: #f8fafc !important;
+    }
+
+    html.dark .text-slate-800,
+    html.dark .text-slate-700,
+    html.dark .text-stone-800,
+    html.dark .text-stone-700,
+    html.dark .text-gray-700,
+    html.dark .text-gray-600 {
+        color: #cbd5e1 !important;
+    }
+
+    html.dark .text-slate-600,
+    html.dark .text-slate-500,
+    html.dark .text-stone-600,
+    html.dark .text-stone-500,
+    html.dark .text-gray-500,
+    html.dark .text-gray-400 {
+        color: #94a3b8 !important;
+    }
+
+    html.dark .border-slate-100,
+    html.dark .border-slate-200,
+    html.dark .border-slate-300,
+    html.dark .border-stone-100,
+    html.dark .border-stone-200,
+    html.dark .border-stone-300,
+    html.dark .border-gray-100,
+    html.dark .border-gray-200,
+    html.dark .border-gray-300,
+    html.dark .border-white,
+    html.dark .border-white\/70,
+    html.dark .border-white\/80 {
+        border-color: rgb(51 65 85 / 0.95) !important;
+    }
+
+    html.dark .divide-slate-100 > :not([hidden]) ~ :not([hidden]),
+    html.dark .divide-slate-200 > :not([hidden]) ~ :not([hidden]) {
+        border-color: rgb(51 65 85 / 0.95) !important;
+    }
+
+    html.dark .shadow,
+    html.dark .shadow-sm,
+    html.dark .shadow-lg,
+    html.dark .shadow-xl,
+    html.dark .shadow-2xl {
+        --tw-shadow-color: rgb(0 0 0 / 0.45) !important;
+        --tw-shadow: var(--tw-shadow-colored) !important;
+    }
+
+    html.dark table tbody tr:hover,
+    html.dark .hover\:bg-slate-50:hover,
+    html.dark .hover\:bg-slate-100:hover,
+    html.dark .hover\:bg-gray-50:hover,
+    html.dark .hover\:bg-gray-100:hover {
+        background-color: rgb(30 41 59 / 0.78) !important;
+    }
+
+    html.dark thead,
+    html.dark .bg-slate-50,
+    html.dark .bg-slate-100 {
+        color: #cbd5e1;
+    }
+
+    html.dark .prose {
+        color: #cbd5e1;
+    }
+
+    html.dark .prose :where(h1, h2, h3, h4, strong):not(:where([class~="not-prose"], [class~="not-prose"] *)) {
+        color: #f8fafc;
+    }
+
+    html.dark .ring-slate-200,
+    html.dark .ring-stone-200 {
+        --tw-ring-color: rgb(51 65 85 / 0.95) !important;
+    }
+
+    html.dark .logo-surface {
+        background-color: #ffffff !important;
+        border-color: rgb(255 255 255 / 0.35) !important;
+    }
+
+    html.dark .student-slot-available {
+        background: linear-gradient(135deg, #dbeafe, #eff6ff) !important;
+        border-color: #93c5fd !important;
+        color: #0f172a !important;
+        box-shadow: 0 10px 24px rgb(37 99 235 / 0.16);
+    }
+
+    html.dark .student-slot-available * {
+        color: #0f172a !important;
+    }
+
+    html.dark .student-slot-available:hover {
+        background: linear-gradient(135deg, #2563eb, #0284c7) !important;
+        border-color: #7dd3fc !important;
+        color: #ffffff !important;
+        box-shadow: 0 16px 34px rgb(14 165 233 / 0.28);
+    }
+
+    html.dark .student-slot-available:hover * {
+        color: #ffffff !important;
+    }
+
+    html.dark .notification-list-section {
+        background-color: #0f172a !important;
+        border-color: #334155 !important;
+    }
+
+    html.dark .admin-notification-card.is-unread {
+        background: linear-gradient(90deg, rgb(30 58 138 / 0.28), rgb(15 23 42 / 0.98)) !important;
+    }
+
+    html.dark .admin-notification-card.is-read {
+        background-color: #0f172a !important;
+    }
+
+    html.dark .admin-notification-card h2 {
+        color: #f8fafc !important;
+    }
+
+    html.dark .admin-notification-card p {
+        color: #cbd5e1 !important;
+    }
+
+    html.dark .admin-notification-card p:last-child {
+        color: #93a4b8 !important;
+    }
+
+    html.dark .admin-notification-card span {
+        background-color: rgb(15 23 42 / 0.95) !important;
+        color: #bfdbfe !important;
+        border: 1px solid rgb(59 130 246 / 0.28);
+    }
+}

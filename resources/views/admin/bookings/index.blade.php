@@ -37,7 +37,7 @@
 
         <div class="mb-6 grid grid-cols-2 gap-3 md:grid-cols-5">
             @foreach($statuses as $status)
-                <a href="{{ route('admin.bookings.index', ['status' => $status]) }}"
+                <a href="{{ route('admin.bookings.index', array_merge(request()->except('page'), ['status' => $status])) }}"
                    class="rounded-lg border {{ request('status') === $status ? 'border-slate-950 bg-white' : 'border-slate-200 bg-white hover:border-slate-300' }} p-4 shadow-sm">
                     <p class="text-xs font-semibold uppercase tracking-wide text-slate-500">{{ $statusLabels[$status] }}</p>
                     <p class="mt-2 text-2xl font-bold text-slate-950">{{ number_format($statusCounts[$status] ?? 0) }}</p>
@@ -48,7 +48,7 @@
         <section class="rounded-lg border border-slate-200 bg-white shadow-sm">
             <div class="border-b border-slate-200 px-5 py-4">
                 <form method="GET" class="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
-                    <div class="grid w-full gap-3 sm:grid-cols-2 lg:grid-cols-[minmax(0,220px)_150px_160px_minmax(0,220px)_auto]">
+                    <div class="grid w-full gap-3 sm:grid-cols-2 lg:grid-cols-[minmax(0,210px)_150px_160px_minmax(0,210px)_minmax(0,190px)_auto]">
                         <label class="block">
                             <span class="text-sm font-medium text-slate-700">Search</span>
                             <input name="search"
@@ -88,11 +88,33 @@
                             </select>
                         </label>
 
+                        @if(Auth::user()?->canManageAllBranches())
+                            <label class="block">
+                                <span class="text-sm font-medium text-slate-700">Branch</span>
+                                <select name="location_id"
+                                        class="mt-1 block w-full rounded-md border-slate-300 text-sm shadow-sm focus:border-blue-500 focus:ring-blue-500">
+                                    <option value="">All branches</option>
+                                    @foreach($locations as $location)
+                                        <option value="{{ $location->id }}" @selected((int) $selectedLocationId === (int) $location->id)>
+                                            {{ $location->name }}
+                                        </option>
+                                    @endforeach
+                                </select>
+                            </label>
+                        @else
+                            <div class="block">
+                                <span class="text-sm font-medium text-slate-700">Branch</span>
+                                <div class="mt-1 flex h-10 items-center rounded-md border border-slate-200 bg-slate-50 px-3 text-sm font-semibold text-slate-600">
+                                    {{ Auth::user()?->managedLocation?->name ?? 'Assigned branch' }}
+                                </div>
+                            </div>
+                        @endif
+
                         <div class="flex items-end gap-2">
                             <button class="inline-flex h-10 items-center justify-center rounded-md bg-slate-950 px-4 text-sm font-semibold text-white hover:bg-slate-800">
                                 Filter
                             </button>
-                            @if(request()->hasAny(['status', 'user_id', 'date', 'period', 'search']))
+                            @if(request()->hasAny(['status', 'user_id', 'date', 'period', 'search', 'location_id']))
                                 <a href="{{ route('admin.bookings.index') }}"
                                    class="inline-flex h-10 items-center justify-center rounded-md border border-slate-300 px-4 text-sm font-semibold text-slate-700 hover:bg-slate-100">
                                     Clear

@@ -15,6 +15,8 @@
         @vite(['resources/css/app.css', 'resources/js/app.js'])
     </head>
     <body class="font-sans text-gray-900 antialiased">
+        <x-toast-notifications />
+
         <div class="min-h-screen bg-[#eef2f0] px-4 py-8">
             <div class="mx-auto flex min-h-[calc(100vh-4rem)] max-w-6xl items-center justify-center">
                 <div class="grid w-full gap-8 lg:grid-cols-[1fr_520px] lg:items-center">

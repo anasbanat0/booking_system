@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Booking;
 use App\Models\ActivityLog;
 use App\Models\AdminNotification;
+use App\Models\BookingLocation;
 use App\Models\Slot;
 use App\Models\User;
 use Illuminate\Http\Request;
@@ -21,12 +22,14 @@ class AdminBookingController extends Controller
     {
         $query = Booking::with(['user', 'slot.location']);
         $statuses = ['booked', 'completed', 'no_show', 'cancelled', 'rescheduled'];
+        $locations = BookingLocation::orderBy('name')->get();
+        $selectedLocationId = $request->user()->canManageAllBranches()
+            ? $request->integer('location_id') ?: null
+            : $request->user()->booking_location_id;
 
-        if (!$request->user()->canManageAllBranches()) {
-            $query->whereHas('slot', function ($slotQuery) use ($request) {
-                $slotQuery->where('booking_location_id', $request->user()->booking_location_id);
-            });
-        }
+        $query->when($selectedLocationId, function ($bookingQuery) use ($selectedLocationId) {
+            $bookingQuery->whereHas('slot', fn ($slotQuery) => $slotQuery->where('booking_location_id', $selectedLocationId));
+        });
 
         if ($request->filled('status') && in_array($request->status, $statuses, true)) {
             $query->where('status', $request->status);
@@ -54,22 +57,22 @@ class AdminBookingController extends Controller
 
         $bookings = $query->latest()->paginate(10)->withQueryString();
         $statusCounts = Booking::selectRaw('status, count(*) as total')
-            ->when(!$request->user()->canManageAllBranches(), function ($countQuery) use ($request) {
-                $countQuery->whereHas('slot', fn ($slotQuery) => $slotQuery->where('booking_location_id', $request->user()->booking_location_id));
+            ->when($selectedLocationId, function ($countQuery) use ($selectedLocationId) {
+                $countQuery->whereHas('slot', fn ($slotQuery) => $slotQuery->where('booking_location_id', $selectedLocationId));
             })
             ->groupBy('status')
             ->pluck('total', 'status');
         $users = User::where('role', 'student')
-            ->when(!$request->user()->canManageAllBranches(), function ($userQuery) use ($request) {
-                $userQuery->where('booking_location_id', $request->user()->booking_location_id);
+            ->when($selectedLocationId, function ($userQuery) use ($selectedLocationId) {
+                $userQuery->where('booking_location_id', $selectedLocationId);
             })
             ->orderBy('name')
             ->get();
         $slots = Slot::with('location')
             ->where('is_active', true)
             ->whereDate('date', '>=', now()->toDateString())
-            ->when(!$request->user()->canManageAllBranches(), function ($slotQuery) use ($request) {
-                $slotQuery->where('booking_location_id', $request->user()->booking_location_id);
+            ->when($selectedLocationId, function ($slotQuery) use ($selectedLocationId) {
+                $slotQuery->where('booking_location_id', $selectedLocationId);
             })
             ->orderBy('date')
             ->orderBy('start_time')
@@ -77,13 +80,13 @@ class AdminBookingController extends Controller
         $periods = Slot::query()
             ->select('start_time', 'end_time')
             ->distinct()
-            ->when(!$request->user()->canManageAllBranches(), function ($slotQuery) use ($request) {
-                $slotQuery->where('booking_location_id', $request->user()->booking_location_id);
+            ->when($selectedLocationId, function ($slotQuery) use ($selectedLocationId) {
+                $slotQuery->where('booking_location_id', $selectedLocationId);
             })
             ->orderBy('start_time')
             ->get();
 
-        return view('admin.bookings.index', compact('bookings', 'statuses', 'statusCounts', 'users', 'slots', 'periods'));
+        return view('admin.bookings.index', compact('bookings', 'statuses', 'statusCounts', 'users', 'slots', 'periods', 'locations', 'selectedLocationId'));
     }
 
     public function storeManual(Request $request)

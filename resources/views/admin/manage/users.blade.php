@@ -15,19 +15,6 @@
                 </p>
             </div>
 
-            @if(session('success'))
-                <div class="mb-5 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-800">{{ session('success') }}</div>
-            @endif
-            @if(session('warning'))
-                <div class="mb-5 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-800">{{ session('warning') }}</div>
-            @endif
-            @if(session('error'))
-                <div class="mb-5 rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-semibold text-rose-800">{{ session('error') }}</div>
-            @endif
-            @if($errors->any())
-                <div class="mb-5 rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-semibold text-rose-800">{{ $errors->first() }}</div>
-            @endif
-
             <div class="mb-6 grid gap-6 xl:grid-cols-[1fr_420px]">
                 <section class="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
                     <h2 class="text-lg font-bold text-slate-950">Add user manually</h2>

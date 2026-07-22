@@ -15,29 +15,6 @@
                 </p>
             </div>
 
-            @if(session('success'))
-                <div class="mb-6 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-800">
-                    {{ session('success') }}
-                </div>
-            @endif
-
-            @if(session('error'))
-                <div class="mb-6 rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-medium text-rose-800">
-                    {{ session('error') }}
-                </div>
-            @endif
-
-            @if($errors->any())
-                <div class="mb-6 rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-800">
-                    <p class="font-semibold">Please check the form fields.</p>
-                    <ul class="mt-2 list-disc space-y-1 ps-5">
-                        @foreach($errors->all() as $error)
-                            <li>{{ $error }}</li>
-                        @endforeach
-                    </ul>
-                </div>
-            @endif
-
             @if(Auth::user()?->canManageAllBranches())
             <section class="mb-6 rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
                 <div class="mb-5">

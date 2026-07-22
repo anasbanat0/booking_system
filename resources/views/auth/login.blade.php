@@ -32,8 +32,6 @@
         <p class="mt-2 text-sm leading-6 text-slate-500">{{ $portalConfig['copy'] }}</p>
     </div>
 
-    <x-auth-session-status class="mb-4" :status="session('status')" />
-
     <form method="POST" action="{{ route('login') }}" class="space-y-4">
         @csrf
 

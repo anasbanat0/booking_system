@@ -14,10 +14,6 @@
                 <p class="mt-2 max-w-2xl text-sm text-slate-600">Track new bookings, cancellations, reschedules, and status changes.</p>
             </div>
 
-            @if(session('success'))
-                <div class="mb-5 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-800">{{ session('success') }}</div>
-            @endif
-
             <div class="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <form method="GET" class="flex gap-2">
                     <select name="type" class="rounded-md border-slate-300 text-sm">
@@ -34,10 +30,10 @@
                 </form>
             </div>
 
-            <section class="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
+            <section class="notification-list-section overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
                 <div class="divide-y divide-slate-100">
                     @forelse($notifications as $notification)
-                        <article class="flex gap-4 px-5 py-4 {{ $notification->read_at ? 'bg-white' : 'bg-blue-50/50' }}">
+                        <article class="admin-notification-card flex gap-4 px-5 py-4 {{ $notification->read_at ? 'is-read bg-white' : 'is-unread bg-blue-50/50' }}">
                             <div class="mt-1 h-3 w-3 rounded-full {{ $notification->read_at ? 'bg-slate-300' : 'bg-blue-700' }}"></div>
                             <div class="min-w-0 flex-1">
                                 <div class="flex flex-wrap items-center gap-2">

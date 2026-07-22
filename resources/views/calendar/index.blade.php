@@ -33,24 +33,6 @@
             </div>
         </div>
 
-        @if(session('success'))
-            <div class="mb-6 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-800">
-                {{ session('success') }}
-            </div>
-        @endif
-
-        @if(session('error'))
-            <div class="mb-6 rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-medium text-rose-800">
-                {{ session('error') }}
-            </div>
-        @endif
-
-        @if($errors->any())
-            <div class="mb-6 rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-medium text-rose-800">
-                {{ $errors->first() }}
-            </div>
-        @endif
-
         @if(Auth::user()?->booking_warning_at)
             <div class="mb-6 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
                 <span class="font-bold">Account notice:</span>
@@ -96,7 +78,7 @@
                                     <input type="hidden" name="slot_id" value="{{ $slot->id }}">
 
                                     <button @disabled($isFull)
-                                            class="w-full rounded-lg border p-3 text-start transition {{ $isFull ? 'cursor-not-allowed border-slate-200 bg-slate-100 text-slate-400' : 'border-blue-200 bg-blue-50 text-slate-900 hover:border-blue-700 hover:bg-blue-700 hover:text-white' }}">
+                                            class="w-full rounded-lg border p-3 text-start transition {{ $isFull ? 'cursor-not-allowed border-slate-200 bg-slate-100 text-slate-400' : 'student-slot-available border-blue-200 bg-blue-50 text-slate-900 hover:border-blue-700 hover:bg-blue-700 hover:text-white' }}">
                                         <span class="block text-xs font-bold">{{ $slot->location?->name ?? 'Branch' }}</span>
                                         <span class="mt-1 block text-sm font-bold">
                                             {{ \Carbon\Carbon::parse($slot->start_time)->format('H:i') }}

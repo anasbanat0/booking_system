@@ -1,12 +1,12 @@
-<nav x-data="{ open: false }" class="bg-white border-b border-gray-100">
+<nav x-data="{ open: false }" class="bg-white border-b border-gray-100 dark:border-slate-800 dark:bg-slate-950">
     <!-- Primary Navigation Menu -->
     <div class="w-full px-4 sm:px-6 lg:px-8">
-        <div class="flex h-20 justify-between">
+        <div class="flex h-24 justify-between sm:h-28">
             <div class="flex">
                 <!-- Logo -->
                 <div class="shrink-0 flex items-center">
-                    <a href="{{ route('dashboard') }}">
-                        <x-application-logo class="block h-16 w-auto fill-current text-gray-800" />
+                    <a href="{{ route('dashboard') }}" class="logo-surface inline-flex items-center rounded-[1.45rem] border border-white bg-white px-4 py-3 shadow-sm shadow-slate-900/5 transition dark:border-white dark:shadow-lg dark:shadow-sky-950/30 sm:px-2">
+                        <x-application-logo class="block h-14 w-auto fill-current text-gray-800 sm:h-16" />
                     </a>
                 </div>
 
@@ -32,9 +32,13 @@
 
             <!-- Settings Dropdown -->
             <div class="hidden sm:flex sm:items-center sm:ms-6">
+                <div class="me-3">
+                    <x-theme-toggle />
+                </div>
+
                 <x-dropdown align="right" width="48">
                     <x-slot name="trigger">
-                        <button class="inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md text-gray-500 bg-white hover:text-gray-700 focus:outline-none transition ease-in-out duration-150">
+                        <button class="inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md text-gray-500 bg-white hover:text-gray-700 focus:outline-none transition ease-in-out duration-150 dark:bg-slate-950 dark:text-slate-300 dark:hover:text-white">
                             <div>{{ Auth::user()->name }}</div>
 
                             <div class="ms-1">
@@ -65,7 +69,9 @@
             </div>
 
             <!-- Hamburger -->
-            <div class="-me-2 flex items-center sm:hidden">
+            <div class="-me-2 flex items-center gap-2 sm:hidden">
+                <x-theme-toggle />
+
                 <button @click="open = ! open" class="inline-flex items-center justify-center p-2 rounded-md text-gray-400 hover:text-gray-500 hover:bg-gray-100 focus:outline-none focus:bg-gray-100 focus:text-gray-500 transition duration-150 ease-in-out">
                     <svg class="h-6 w-6" stroke="currentColor" fill="none" viewBox="0 0 24 24">
                         <path :class="{'hidden': open, 'inline-flex': ! open }" class="inline-flex" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
@@ -97,10 +103,10 @@
         </div>
 
         <!-- Responsive Settings Options -->
-        <div class="pt-4 pb-1 border-t border-gray-200">
+        <div class="pt-4 pb-1 border-t border-gray-200 dark:border-slate-800">
             <div class="px-4">
-                <div class="font-medium text-base text-gray-800">{{ Auth::user()->name }}</div>
-                <div class="font-medium text-sm text-gray-500">{{ Auth::user()->email }}</div>
+                <div class="font-medium text-base text-gray-800 dark:text-slate-100">{{ Auth::user()->name }}</div>
+                <div class="font-medium text-sm text-gray-500 dark:text-slate-400">{{ Auth::user()->email }}</div>
             </div>
 
             <div class="mt-3 space-y-1">

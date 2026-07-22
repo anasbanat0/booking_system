@@ -55,24 +55,6 @@
                 </div>
             </div>
 
-            @if(session('success'))
-                <div class="mb-5 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-800">
-                    {{ session('success') }}
-                </div>
-            @endif
-
-            @if(session('error'))
-                <div class="mb-5 rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-semibold text-rose-800">
-                    {{ session('error') }}
-                </div>
-            @endif
-
-            @if($errors->any())
-                <div class="mb-5 rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-semibold text-rose-800">
-                    {{ $errors->first() }}
-                </div>
-            @endif
-
             <div class="mb-5 rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
                 <form method="GET" class="grid gap-3 md:grid-cols-[140px_180px_1fr_auto] md:items-end">
                     <label class="block">
