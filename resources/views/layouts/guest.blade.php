@@ -5,7 +5,19 @@
         <meta name="viewport" content="width=device-width, initial-scale=1">
         <meta name="csrf-token" content="{{ csrf_token() }}">
 
-        <title>{{ config('app.name', 'Laravel') }}</title>
+        @php
+            $siteTitle = \App\Models\SiteContent::getValue('page_title', 'Samir Medical Hub') ?: 'Samir Medical Hub';
+            $routeTitles = [
+                'login' => 'Student Login',
+                'staff.login' => 'Staff Login',
+                'admin.login' => 'Admin Login',
+                'register' => 'Create Account',
+                'password.request' => 'Reset Password',
+                'password.reset' => 'Set Password',
+            ];
+            $pageTitle = $routeTitles[request()->route()?->getName()] ?? null;
+        @endphp
+        <title>{{ $pageTitle ? $pageTitle . ' - ' . $siteTitle : $siteTitle }}</title>
 
         <!-- Fonts -->
         <link rel="preconnect" href="https://fonts.bunny.net">

@@ -153,6 +153,11 @@
         border-color: rgb(255 255 255 / 0.35) !important;
     }
 
+    .logo-surface img {
+        max-width: 100%;
+        object-fit: contain;
+    }
+
     html.dark .student-slot-available {
         background: linear-gradient(135deg, #dbeafe, #eff6ff) !important;
         border-color: #93c5fd !important;
@@ -204,5 +209,216 @@
         background-color: rgb(15 23 42 / 0.95) !important;
         color: #bfdbfe !important;
         border: 1px solid rgb(59 130 246 / 0.28);
+    }
+
+    .instructions-content h2 {
+        border-inline-start: 5px solid #0d9488;
+        background: linear-gradient(90deg, rgb(240 253 250), rgb(255 255 255));
+        border-radius: 0.75rem;
+        font-size: 1.85rem !important;
+        font-weight: 900 !important;
+        line-height: 1.45 !important;
+        padding: 1rem 1.15rem;
+        color: #0f766e !important;
+    }
+
+    .instructions-content h3 {
+        font-size: 1.35rem !important;
+        font-weight: 900 !important;
+        line-height: 1.6 !important;
+        color: #1d4ed8 !important;
+    }
+
+    .arabic-instructions-font {
+        font-family: "Cairo", "Figtree", ui-sans-serif, system-ui, sans-serif;
+    }
+
+    html.dark .instructions-content h2 {
+        background: linear-gradient(90deg, rgb(20 184 166 / 0.16), rgb(15 23 42));
+        color: #99f6e4 !important;
+    }
+
+    html.dark .instructions-content h3 {
+        color: #93c5fd !important;
+    }
+
+    .instructions-hero-title,
+    .instructions-hero-description,
+    .instructions-content {
+        overflow-wrap: anywhere;
+    }
+
+    .supporter-carousel {
+        --supporter-gap: 1rem;
+        --supporter-card-width: 13.5rem;
+        --supporter-count: 1;
+        overflow: hidden;
+        position: relative;
+        mask-image: linear-gradient(90deg, transparent, #000 8%, #000 92%, transparent);
+    }
+
+    .public-home-page,
+    .public-home-page * {
+        box-sizing: border-box;
+        min-width: 0;
+    }
+
+    .public-home-page {
+        max-width: 100vw;
+        overflow-x: hidden;
+    }
+
+    .public-home-hero-title,
+    .public-home-hero-text {
+        max-width: 100%;
+        overflow-wrap: anywhere;
+        text-wrap: pretty;
+    }
+
+    .supporter-carousel--compact {
+        --supporter-card-width: 7.75rem;
+        --supporter-gap: 0.5rem;
+    }
+
+    .supporter-carousel__track {
+        animation: supporter-carousel-scroll 24s linear infinite;
+        display: flex;
+        gap: var(--supporter-gap);
+        width: max-content;
+    }
+
+    .supporter-carousel:hover .supporter-carousel__track {
+        animation-play-state: paused;
+    }
+
+    .supporter-carousel__item {
+        align-items: center;
+        background: #ffffff;
+        border: 1px solid rgb(226 232 240);
+        border-radius: 0.75rem;
+        box-shadow: 0 1px 2px rgb(15 23 42 / 0.05);
+        display: flex;
+        flex: 0 0 var(--supporter-card-width);
+        justify-content: center;
+    }
+
+    .supporter-carousel__item--compact {
+        height: 5rem;
+        padding: 0.5rem;
+    }
+
+    .supporter-carousel__item--wide {
+        flex-direction: column;
+        min-height: 9.5rem;
+        padding: 1rem;
+        text-decoration: none;
+    }
+
+    @keyframes supporter-carousel-scroll {
+        from {
+            transform: translateX(0);
+        }
+
+        to {
+            transform: translateX(calc(-1 * ((var(--supporter-card-width) + var(--supporter-gap)) * var(--supporter-count))));
+        }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+        .supporter-carousel__track {
+            animation: none;
+            overflow-x: auto;
+            width: auto;
+        }
+    }
+
+    @media (min-width: 640px) and (max-width: 1023px) {
+        .public-home-hero-logo {
+            max-width: min(72vw, 28rem);
+        }
+
+        .public-home-hero-logo img {
+            max-width: 100%;
+        }
+    }
+
+    @media (max-width: 1023px) {
+        .public-home-hero-logo,
+        .public-home-hero-logo + div,
+        .public-home-hero-logo + div * {
+            min-width: 0;
+        }
+
+        .public-home-hero-logo img {
+            object-fit: contain;
+        }
+
+        .supporter-carousel--compact {
+            --supporter-card-width: 6.8rem;
+        }
+    }
+
+    @media (max-width: 639px) {
+        .public-home-hero-logo {
+            max-width: min(86vw, 18rem);
+        }
+
+        .public-home-hero-title {
+            font-size: clamp(2rem, 10.5vw, 2.65rem) !important;
+            line-height: 1.08 !important;
+        }
+
+        .public-home-hero-text {
+            font-size: 0.98rem !important;
+            line-height: 1.75 !important;
+        }
+
+        .supporter-carousel {
+            mask-image: none;
+        }
+
+        .supporter-carousel--wide {
+            --supporter-card-width: 11rem;
+        }
+
+        .logo-surface {
+            max-width: min(58vw, 12rem) !important;
+        }
+
+        .logo-surface img {
+            max-height: 2.25rem !important;
+        }
+
+        .instructions-hero-title {
+            font-size: clamp(1.75rem, 8.5vw, 2.25rem) !important;
+            line-height: 1.22 !important;
+        }
+
+        .instructions-hero-description {
+            font-size: 0.95rem !important;
+            line-height: 1.8 !important;
+        }
+
+        .instructions-content h2 {
+            font-size: 1.35rem !important;
+            line-height: 1.55 !important;
+            padding: 0.75rem 0.85rem;
+        }
+
+        .instructions-content h3 {
+            font-size: 1.12rem !important;
+        }
+    }
+
+    @media (max-width: 400px) {
+        .logo-surface {
+            max-width: min(54vw, 10.5rem) !important;
+            border-radius: 0.9rem !important;
+            padding: 0.35rem 0.5rem !important;
+        }
+
+        .logo-surface img {
+            max-height: 2rem !important;
+        }
     }
 }

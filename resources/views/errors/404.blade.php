@@ -7,11 +7,12 @@
     @vite(['resources/css/app.css', 'resources/js/app.js'])
 </head>
 <body class="bg-slate-50 font-sans text-slate-950">
+    @php($siteLogoUrl = \App\Models\SiteContent::getValue('site_logo_url', ''))
     <main class="flex min-h-screen items-center justify-center px-4 py-10">
         <section class="w-full max-w-3xl rounded-lg border border-slate-200 bg-white p-8 shadow-sm">
             <div class="flex items-center gap-3">
                 <div class="flex h-14 w-14 items-center justify-center rounded-lg border border-slate-200 bg-white p-2">
-                    <img src="{{ Vite::asset('resources/images/logo.png') }}" alt="Booking System" class="h-full w-full object-contain">
+                    <img src="{{ $siteLogoUrl ?: Vite::asset('resources/images/logo.png') }}" alt="Booking System" class="h-full w-full object-contain">
                 </div>
                 <div>
                     <p class="text-sm font-bold uppercase tracking-wide text-blue-700">404 Not Found</p>

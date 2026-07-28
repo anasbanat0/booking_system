@@ -5,7 +5,26 @@
         <meta name="viewport" content="width=device-width, initial-scale=1">
         <meta name="csrf-token" content="{{ csrf_token() }}">
 
-        <title>{{ config('app.name', 'Laravel') }}</title>
+        @php
+            $siteTitle = \App\Models\SiteContent::getValue('page_title', 'Samir Medical Hub') ?: 'Samir Medical Hub';
+            $routeTitles = [
+                'calendar.index' => 'Calendar',
+                'bookings.my' => 'My Bookings',
+                'instructions' => 'Instructions',
+                'admin.dashboard' => 'Dashboard',
+                'admin.bookings.index' => 'Bookings',
+                'admin.users-calendar.index' => 'Users Calendar',
+                'admin.notifications.index' => 'Notifications',
+                'admin.slots.index' => 'Slots Time',
+                'admin.manage.users.index' => 'Manage Users',
+                'admin.content.index' => 'Homepage',
+                'admin.activity.index' => 'Activity Log',
+                'admin.booking-rules.update' => 'Booking Rules',
+                'profile.edit' => 'Profile',
+            ];
+            $pageTitle = $routeTitles[request()->route()?->getName()] ?? null;
+        @endphp
+        <title>{{ $pageTitle ? $pageTitle . ' - ' . $siteTitle : $siteTitle }}</title>
 
         <script>
             (() => {
@@ -20,7 +39,7 @@
 
         <!-- Fonts -->
         <link rel="preconnect" href="https://fonts.bunny.net">
-        <link href="https://fonts.bunny.net/css?family=figtree:400,500,600&display=swap" rel="stylesheet" />
+        <link href="https://fonts.bunny.net/css?family=figtree:400,500,600,700,800|cairo:400,600,700,800,900&display=swap" rel="stylesheet" />
 
         <!-- Scripts -->
         @vite(['resources/css/app.css', 'resources/js/app.js'])

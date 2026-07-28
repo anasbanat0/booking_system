@@ -6,6 +6,7 @@ use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Schedule;
 use App\Models\Booking;
 use App\Models\BookingRule;
+use App\Services\WhatsAppService;
 use Carbon\Carbon;
 
 Artisan::command('inspire', function () {
@@ -29,7 +30,7 @@ Artisan::command('bookings:send-reminders', function () {
         })
         ->chunkById(100, function ($bookings) use ($now, $deadline, &$sent) {
             foreach ($bookings as $booking) {
-                if (!$booking->user?->email || !$booking->slot) {
+                if (!$booking->user || !$booking->slot) {
                     continue;
                 }
 
@@ -39,15 +40,31 @@ Artisan::command('bookings:send-reminders', function () {
                     continue;
                 }
 
-                Mail::raw(
-                    'Reminder: your booking is scheduled for ' . $booking->slot->date . ' from ' . $booking->slot->start_time . ' to ' . $booking->slot->end_time . ' at ' . ($booking->slot->location?->name ?? 'the hub') . '.',
-                    function ($mail) use ($booking) {
-                        $mail->to($booking->user->email)->subject('Booking reminder');
-                    }
-                );
+                $attempted = false;
 
-                $booking->update(['reminder_sent_at' => now()]);
-                $sent++;
+                if ($booking->user->email) {
+                    try {
+                        Mail::raw(
+                            'Reminder: your booking is scheduled for ' . $booking->slot->date . ' from ' . $booking->slot->start_time . ' to ' . $booking->slot->end_time . ' at ' . ($booking->slot->location?->name ?? 'the hub') . '.',
+                            function ($mail) use ($booking) {
+                                $mail->to($booking->user->email)->subject('Booking reminder');
+                            }
+                        );
+
+                        $attempted = true;
+                    } catch (\Throwable $exception) {
+                        $this->warn('Reminder email failed for booking #' . $booking->id . ': ' . $exception->getMessage());
+                    }
+                }
+
+                if (app(WhatsAppService::class)->sendBookingReminder($booking)) {
+                    $attempted = true;
+                }
+
+                if ($attempted) {
+                    $booking->update(['reminder_sent_at' => now()]);
+                    $sent++;
+                }
             }
         });
 

@@ -5,9 +5,11 @@ namespace App\Http\Controllers;
 use App\Models\BookingLocation;
 use App\Models\ActivityLog;
 use App\Models\User;
+use App\Services\WhatsAppService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Password;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\Rule;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
@@ -69,7 +71,8 @@ class AdminManageUserController extends Controller
             'password' => $validated['password'] ?? 'password',
         ]);
 
-        Password::sendResetLink(['email' => $user->email]);
+        $this->sendAccountCreatedWhatsAppAfterResponse($user);
+        $this->sendPasswordSetupLinkAfterResponse($user);
         ActivityLog::record('user_created', 'User created', $user->name . ' was created from Manage Users.', [
             'user_id' => $user->id,
             'properties' => ['role' => $user->role],
@@ -141,12 +144,12 @@ class AdminManageUserController extends Controller
     {
         $this->authorizeUserManagement(request(), $user);
 
-        Password::sendResetLink(['email' => $user->email]);
+        $this->sendPasswordSetupLinkAfterResponse($user);
         ActivityLog::record('password_link_sent', 'Password setup link sent', 'A password setup link was sent to ' . $user->email . '.', [
             'user_id' => $user->id,
         ]);
 
-        return back()->with('success', 'Password setup link sent to ' . $user->email . '.');
+        return back()->with('success', 'Password setup link sent to ' . $user->email . ' and WhatsApp when a valid phone is available.');
     }
 
     public function import(Request $request)
@@ -216,7 +219,8 @@ class AdminManageUserController extends Controller
                 'password' => $data['password'] ?? 'password',
             ]);
 
-            Password::sendResetLink(['email' => $user->email]);
+            $this->sendAccountCreatedWhatsAppAfterResponse($user);
+            $this->sendPasswordSetupLinkAfterResponse($user);
             ActivityLog::record('user_imported', 'User imported', $user->name . ' was imported or updated from CSV.', [
                 'user_id' => $user->id,
                 'properties' => ['role' => $user->role],
@@ -322,5 +326,31 @@ class AdminManageUserController extends Controller
         }
 
         return $branchId;
+    }
+
+    private function sendAccountCreatedWhatsAppAfterResponse(User $user): void
+    {
+        app()->terminating(function () use ($user) {
+            app(WhatsAppService::class)->sendAccountCreated($user);
+        });
+    }
+
+    private function sendPasswordSetupLinkAfterResponse(User $user): void
+    {
+        app()->terminating(function () use ($user) {
+            $this->sendPasswordSetupChannels($user);
+        });
+    }
+
+    private function sendPasswordSetupChannels(User $user): void
+    {
+        $status = Password::sendResetLink(['email' => $user->email]);
+
+        if ($status !== Password::RESET_LINK_SENT) {
+            Log::warning('Password setup link could not be generated.', [
+                'user_id' => $user->id,
+                'status' => $status,
+            ]);
+        }
     }
 }

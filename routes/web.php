@@ -16,73 +16,23 @@ use App\Models\BookingLocation;
 use App\Models\SiteContent;
 use App\Models\Slot;
 use App\Models\User;
+use App\Support\HomepageContent;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Schema;
 
 Route::get('/', function () {
-    $hasUsers = Schema::hasTable('users');
-    $hasBookings = Schema::hasTable('bookings');
-    $hasSlots = Schema::hasTable('slots');
-    $hasLocations = Schema::hasTable('booking_locations');
-
-    return view('welcome', [
-        'content' => [
-            'page_title' => SiteContent::getValue('page_title', 'Medical Hub - Samir Foundation'),
-            'brand_title' => SiteContent::getValue('brand_title', 'Samir Foundation'),
-            'brand_subtitle' => SiteContent::getValue('brand_subtitle', 'Medical Hub'),
-            'hero_eyebrow' => SiteContent::getValue('hero_eyebrow', 'Quiet power for serious study'),
-            'hero_title' => SiteContent::getValue('hero_title', 'Reserve a calm, connected seat for exams and study.'),
-            'project_intro' => SiteContent::getValue('project_intro', 'A quiet, reliable Medical Hub by Samir Foundation, prepared for students who need stable electricity, internet, and a focused place to study or take online exams.'),
-            'primary_cta_guest' => SiteContent::getValue('primary_cta_guest', 'Login to book'),
-            'primary_cta_auth' => SiteContent::getValue('primary_cta_auth', 'Open dashboard'),
-            'stat_students_label' => SiteContent::getValue('stat_students_label', 'Students'),
-            'stat_bookings_label' => SiteContent::getValue('stat_bookings_label', 'Bookings'),
-            'stat_seats_label' => SiteContent::getValue('stat_seats_label', 'Seats left'),
-            'stat_branches_label' => SiteContent::getValue('stat_branches_label', 'Branches'),
-            'student_card_eyebrow' => SiteContent::getValue('student_card_eyebrow', 'Start here'),
-            'student_card_title' => SiteContent::getValue('student_card_title', 'Student access'),
-            'student_card_description' => SiteContent::getValue('student_card_description', 'Sign in to reserve a prepared seat with power, internet, and a quiet environment.'),
-            'student_card_guest_button' => SiteContent::getValue('student_card_guest_button', 'Continue to login'),
-            'student_card_help_button' => SiteContent::getValue('student_card_help_button', 'Need help accessing your account?'),
-            'student_card_auth_button' => SiteContent::getValue('student_card_auth_button', 'View weekly calendar'),
-            'team_card_eyebrow' => SiteContent::getValue('team_card_eyebrow', 'Team access'),
-            'team_card_description' => SiteContent::getValue('team_card_description', 'Staff manage only their assigned branch. Admins manage all branches, users, settings, imports, and exports.'),
-            'team_staff_button' => SiteContent::getValue('team_staff_button', 'Staff login'),
-            'team_admin_button' => SiteContent::getValue('team_admin_button', 'Admin login'),
-            'partners_heading' => SiteContent::getValue('partners_heading', 'Supporting partners'),
-            'partners_empty_text' => SiteContent::getValue('partners_empty_text', 'Partner logos image can be added from the public images folder.'),
-            'step_1_label' => SiteContent::getValue('step_1_label', '01'),
-            'step_1_title' => SiteContent::getValue('step_1_title', 'Book ahead'),
-            'step_1_description' => SiteContent::getValue('step_1_description', 'Choose your branch and weekly time before coming to the hub.'),
-            'step_2_label' => SiteContent::getValue('step_2_label', '02'),
-            'step_2_title' => SiteContent::getValue('step_2_title', 'Arrive prepared'),
-            'step_2_description' => SiteContent::getValue('step_2_description', 'Use a calm seat with electricity and internet for studying or online exams.'),
-            'step_3_label' => SiteContent::getValue('step_3_label', '03'),
-            'step_3_title' => SiteContent::getValue('step_3_title', 'Manage responsibly'),
-            'step_3_description' => SiteContent::getValue('step_3_description', 'Review, cancel, or reschedule from your account when changes are allowed.'),
-            'contact_info' => SiteContent::getValue('contact_info', ''),
-            'supporters' => SiteContent::getValue('supporters', ''),
-            'footer_title' => SiteContent::getValue('footer_title', 'Samir Foundation Medical Hub'),
-            'footer_description' => SiteContent::getValue('footer_description', 'A student-focused hub prepared for calm study, online exams, stable electricity, and reliable internet access.'),
-            'footer_cta_text' => SiteContent::getValue('footer_cta_text', 'Need to update information or add a supporting partner announcement?'),
-            'footer_cta_url' => SiteContent::getValue('footer_cta_url', ''),
-            'footer_cta_button' => SiteContent::getValue('footer_cta_button', 'Open link'),
-            'footer_contact_heading' => SiteContent::getValue('footer_contact_heading', 'Contact'),
-            'footer_support_heading' => SiteContent::getValue('footer_support_heading', 'Support and links'),
-            'supporters_note' => SiteContent::getValue('supporters_note', 'Supporting education access through prepared study spaces in Gaza and Khan Younis.'),
-            'footer_bottom_text' => SiteContent::getValue('footer_bottom_text', 'Samir Foundation Medical Hub. Built for focused learning access.'),
-            'social_links' => SiteContent::getValue('social_links', ''),
-        ],
-        'stats' => [
-            'students' => $hasUsers ? User::where('role', 'student')->count() : 0,
-            'bookings' => $hasBookings ? Booking::count() : 0,
-            'availableSeats' => $hasSlots ? Slot::where('is_active', true)
-                ->selectRaw('COALESCE(SUM(capacity - booked_count), 0) as total')
-                ->value('total') : 0,
-            'branches' => $hasLocations ? BookingLocation::where('is_active', true)->count() : 0,
-        ],
-    ]);
+    return view('welcome', HomepageContent::payload());
 });
+
+Route::redirect('/hubs/khanyounis', '/hubs/khan-younis');
+Route::redirect('/hubs/khan-younes', '/hubs/khan-younis');
+Route::redirect('/hubs/khanieness', '/hubs/khan-younis');
+
+Route::get('/hubs/{location:slug}', function (BookingLocation $location) {
+    abort_unless($location->is_active, 404);
+
+    return view('welcome', HomepageContent::payload($location));
+})->name('hubs.show');
 
 Route::get('/dashboard', function () {
     if (auth()->user()?->role === 'admin') {
@@ -106,69 +56,72 @@ Route::middleware('auth')->group(function () {
         Route::get('/calendar', [CalendarController::class, 'index'])->name('calendar.index');
         Route::get('/instructions', function () {
             $defaultInstructions = <<<'HTML'
-<h2>Operating days</h2>
-<p>The Medical Hub is open from Saturday to Thursday.</p>
+<h2>أيام عمل المكان</h2>
+<p>من السبت إلى الخميس.</p>
 
-<h2>Daily time periods</h2>
+<h2>فترات العمل داخل المكان</h2>
 <ul>
-    <li>First period: 8:30 AM to 11:30 AM.</li>
-    <li>Second period: 11:30 AM to 2:30 PM.</li>
-    <li>Third period: 2:30 PM to 5:30 PM.</li>
+    <li>الفترة الأولى: من الساعة 8:30 صباحًا حتى 11:30 ظهرًا.</li>
+    <li>الفترة الثانية: من الساعة 11:30 صباحًا حتى 2:30 مساءً.</li>
+    <li>الفترة الثالثة: من الساعة 2:30 مساءً حتى 5:30 مساءً.</li>
 </ul>
 
-<h2>Booking rules</h2>
+<h2>نظام الحجز</h2>
 <ul>
-    <li>Each student may book up to 12 times per month.</li>
-    <li>Each student may book one period per day, with a maximum of 3 bookings per week.</li>
-    <li>Bookings are weekly only. Monthly booking is not available.</li>
+    <li>يُسمح لكل طالب/ة بالحجز 12 مرة شهريًا كحد أقصى.</li>
+    <li>يُسمح بالحجز لفترة واحدة في اليوم، وبحد أقصى 3 حجوزات في الأسبوع.</li>
+    <li>الحجز يتم فقط على أساس أسبوعي، ولا يُتاح الحجز الشهري.</li>
 </ul>
 
-<h2>Cancellation and rescheduling</h2>
+<h2>الإلغاء وإعادة الجدولة</h2>
 <ul>
-    <li>A booking may be cancelled at any time, but the student cannot replace it with another booking after cancellation.</li>
-    <li>A booking may be rescheduled to another available time up to 12 hours before the original booking starts.</li>
-    <li>For emergency cancellations, the student may request compensation by contacting the on-site administrator and explaining the reason for cancellation.</li>
-    <li>If a student cancels or misses more than 3 bookings in one month, one available booking day will be deducted from the student.</li>
+    <li>يمكن إلغاء الحجز في أي وقت، ولكن لا يحق للطالب استبدال حجز آخر بعد الإلغاء.</li>
+    <li>يمكن إعادة جدولة الحجز لموعد آخر حتى 12 ساعة قبل بداية الحجز الأساسي.</li>
+    <li>في حال وجود ظرف طارئ لإلغاء الحجز، يمكن تعويض هذا الحجز عبر الاتصال على رقم الإداري المتواجد بالمكان مع ضرورة توضيح سبب الإلغاء.</li>
+    <li>في حال تم الإلغاء أو عدم الحضور لأكثر من 3 حجوزات في الشهر، سيتم خصم يوم واحد من الأيام المتاحة للطالب.</li>
 </ul>
 
-<h2>Booking or cancellation support</h2>
-<p>If you face an issue with booking or cancellation through the website, contact the following number by direct call or WhatsApp during official working hours only: <strong>00972597231717</strong>.</p>
+<h2>في حال وجود مشكلة في الحجز أو الإلغاء عبر الموقع</h2>
+<p>يمكنك التواصل على الرقم التالي عبر الاتصال المباشر أو من خلال الواتساب خلال أوقات العمل الرسمية فقط: <strong>00972597231717</strong>.</p>
 
-<h2>Conduct inside the hub</h2>
+<h2>ضوابط السلوك داخل المكان</h2>
 <ul>
-    <li>Please keep the space quiet.</li>
-    <li>Eating inside the hub is not allowed.</li>
-    <li>Please leave the space clean and organized after use out of respect for other students.</li>
+    <li>يُرجى المحافظة على الهدوء داخل المكان.</li>
+    <li>يُمنع الأكل داخل المكان.</li>
+    <li>نأمل منكم ترك المساحة مرتبة بعد الاستخدام احترامًا لزملائكم والمستخدمين بعدها.</li>
 </ul>
 
-<h2>Time commitment</h2>
-<p>Please arrive on time for your booking to make full use of the reserved period.</p>
+<h2>الالتزام بالوقت</h2>
+<p>يُرجى الالتزام بموعد الحجز بدقة لضمان الاستفادة الكاملة من الوقت المحدد.</p>
 
-<h2>Use of resources</h2>
+<h2>استخدام الموارد</h2>
 <ul>
-    <li>Hub resources are for study purposes only.</li>
-    <li>Tools or equipment may not be moved outside the hub without permission.</li>
-    <li>Only the device being used may be charged inside the hub, to help preserve electricity and allow all students to benefit.</li>
+    <li>الموارد المتاحة داخل المكان مخصصة لأغراض دراسية فقط.</li>
+    <li>يُمنع نقل الأدوات أو المعدات خارج المكان دون إذن.</li>
+    <li>يُسمح بشحن الجهاز المُستخدم فقط داخل المكان، وذلك حرصًا على توفير الكهرباء وتمكين جميع الطلبة من الاستفادة.</li>
 </ul>
 
-<h2>Personal responsibility</h2>
+<h2>المسؤولية الشخصية</h2>
 <ul>
-    <li>Students are responsible for any damage to furniture or equipment caused by misuse.</li>
-    <li>Protecting the hub and its property is a shared responsibility that helps keep the service available at a high standard.</li>
+    <li>الطالب يتحمّل المسؤولية عن أي تلف في الأثاث أو المعدات نتيجة سوء الاستخدام.</li>
+    <li>الحفاظ على ممتلكات المكان مسؤولية جماعية تُسهم في استمرارية تقديم الخدمة بجودة عالية.</li>
 </ul>
 
-<h2>Booking priority</h2>
-<p>Priority for same-day booking and use of the hub is given to students who have exams.</p>
+<h2>أولوية الحجز</h2>
+<p>تُعطى أولوية حجز واستخدام المكان في نفس اليوم للطلبة الذين لديهم امتحانات.</p>
 
-<h2>Feedback and evaluation</h2>
+<h2>الملاحظات والتقييم</h2>
 <ul>
-    <li>The hub administration periodically reviews student usage to improve the service.</li>
-    <li>Please cooperate in completing any requested surveys.</li>
+    <li>تقوم إدارة المكان بتقييم استخدام الطلبة بشكل دوري لتحسين الخدمة.</li>
+    <li>نرجو التعاون في تعبئة أي استبيانات عند الطلب.</li>
 </ul>
 HTML;
 
             return view('instructions', [
-                'instructionsEn' => SiteContent::getValue('instructions_en', $defaultInstructions),
+                'instructionsAr' => SiteContent::getValue('instructions_ar', $defaultInstructions) ?: $defaultInstructions,
+                'instructionsHeroEyebrow' => SiteContent::getValue('instructions_hero_eyebrow', 'Samir Foundation Medical Hub'),
+                'instructionsHeroTitle' => SiteContent::getValue('instructions_hero_title', 'تعليمات الحجز واستخدام المكان'),
+                'instructionsHeroDescription' => SiteContent::getValue('instructions_hero_description', 'مساحة هادئة ومجهزة للطلبة الذين يحتاجون إلى كهرباء مستقرة، اتصال إنترنت، وبيئة مناسبة للدراسة أو تقديم الامتحانات الإلكترونية.'),
             ]);
         })->name('instructions');
         Route::post('/book-slot', [BookingController::class, 'store'])->name('book.slot');

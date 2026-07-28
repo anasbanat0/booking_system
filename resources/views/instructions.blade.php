@@ -1,22 +1,25 @@
 @extends('layouts.app')
 
 @section('content')
-<div class="min-h-screen bg-[#eef2f0]">
-    <main class="mx-auto max-w-5xl px-4 py-8 sm:px-6 lg:px-8">
+<div class="min-h-screen overflow-x-hidden bg-[#eef2f0]">
+    <main class="mx-auto w-full max-w-5xl px-3 py-5 sm:px-6 sm:py-8 lg:px-8">
         <section class="overflow-hidden rounded-xl border border-white bg-white shadow-xl shadow-slate-900/10">
-            <div class="bg-[#071817] px-6 py-8 text-white sm:px-8">
-                <p class="text-sm font-extrabold uppercase tracking-[0.24em] text-teal-200">Samir Foundation Medical Hub</p>
-                <h1 class="mt-4 text-4xl font-black tracking-tight lg:text-5xl">Booking instructions</h1>
-                <p class="mt-4 max-w-3xl text-base leading-8 text-white/72">
-                    A quiet, equipped space for students who need reliable electricity, internet access, and a focused environment for studying or online exams.
+            <div class="arabic-instructions-font bg-[#071817] px-4 py-8 text-center text-white sm:px-8 sm:py-10">
+                <p dir="rtl" class="mx-auto max-w-full break-words text-xs font-extrabold uppercase tracking-[0.18em] text-teal-200 sm:text-sm sm:tracking-[0.24em]">
+                    {{ $instructionsHeroEyebrow }}
+                </p>
+                <h1 dir="rtl" class="instructions-hero-title mx-auto mt-4 max-w-4xl break-words text-3xl font-black leading-tight tracking-tight sm:text-4xl lg:text-5xl">
+                    {{ $instructionsHeroTitle }}
+                </h1>
+                <p dir="rtl" class="instructions-hero-description mx-auto mt-5 max-w-3xl break-words text-base font-semibold leading-8 text-white/78 sm:text-lg sm:leading-9">
+                    {{ $instructionsHeroDescription }}
                 </p>
             </div>
 
-            <div class="p-6 sm:p-8">
-                <div class="prose max-w-none text-slate-900 leading-9 prose-headings:text-slate-950 prose-strong:text-slate-950">
-                    {!! $instructionsEn !!}
+            <div class="p-4 sm:p-8">
+                <div dir="rtl" class="arabic-instructions-font instructions-content prose max-w-none text-right leading-9 text-slate-900 prose-headings:text-slate-950 prose-strong:text-slate-950">
+                    {!! $instructionsAr !!}
                 </div>
-
             </div>
         </section>
     </main>

@@ -1,12 +1,12 @@
 <nav x-data="{ open: false }" class="bg-white border-b border-gray-100 dark:border-slate-800 dark:bg-slate-950">
     <!-- Primary Navigation Menu -->
-    <div class="w-full px-4 sm:px-6 lg:px-8">
-        <div class="flex h-24 justify-between sm:h-28">
-            <div class="flex">
+    <div class="w-full px-3 sm:px-5 lg:px-8">
+        <div class="flex h-16 justify-between sm:h-20 lg:h-24">
+            <div class="flex min-w-0">
                 <!-- Logo -->
                 <div class="shrink-0 flex items-center">
-                    <a href="{{ route('dashboard') }}" class="logo-surface inline-flex items-center rounded-[1.45rem] border border-white bg-white px-4 py-3 shadow-sm shadow-slate-900/5 transition dark:border-white dark:shadow-lg dark:shadow-sky-950/30 sm:px-2">
-                        <x-application-logo class="block h-14 w-auto fill-current text-gray-800 sm:h-16" />
+                    <a href="{{ route('dashboard') }}" class="logo-surface inline-flex max-w-[12rem] items-center overflow-hidden rounded-2xl border border-white bg-white px-2 py-1.5 shadow-sm shadow-slate-900/5 transition dark:border-white dark:shadow-lg dark:shadow-sky-950/30 sm:max-w-[19rem] lg:max-w-[24rem]">
+                        <x-application-logo class="block h-9 w-full object-contain fill-current text-gray-800 sm:h-11 lg:h-12" />
                     </a>
                 </div>
 

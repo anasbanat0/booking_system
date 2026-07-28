@@ -7,6 +7,7 @@ use App\Models\ActivityLog;
 use App\Models\AdminNotification;
 use App\Models\BookingRule;
 use App\Models\Slot;
+use App\Services\WhatsAppService;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -30,8 +31,9 @@ class BookingController extends Controller
         $user = $request->user();
 
         $email = null;
+        $whatsapp = null;
 
-        $response = $this->transactionWithReconnect(function () use ($request, $user, &$email) {
+        $response = $this->transactionWithReconnect(function () use ($request, $user, &$email, &$whatsapp) {
             $slot = Slot::lockForUpdate()->findOrFail($request->slot_id);
 
             $this->validateNewBooking($user->id, $slot);
@@ -45,6 +47,7 @@ class BookingController extends Controller
             $slot->increment('booked_count');
             $this->notifyAdmins($booking, 'booking_created', 'New booking', $user->name . ' booked ' . $slot->date . ' from ' . $slot->start_time . ' to ' . $slot->end_time . '.');
             $email = $this->emailPayload($booking, 'Booking confirmed', 'Your booking is confirmed for ' . $slot->date . ' from ' . $slot->start_time . ' to ' . $slot->end_time . '.');
+            $whatsapp = ['type' => 'booking_confirmed', 'booking_id' => $booking->id];
             ActivityLog::record('booking_created', 'Booking created', $user->name . ' created a booking.', [
                 'user_id' => $user->id,
                 'booking_id' => $booking->id,
@@ -55,6 +58,7 @@ class BookingController extends Controller
         });
 
         $this->sendEmailAfterResponse($email);
+        $this->sendWhatsAppAfterResponse($whatsapp);
 
         return $response;
     }
@@ -68,8 +72,9 @@ class BookingController extends Controller
         abort_unless($booking->user_id === $request->user()->id, 403);
 
         $email = null;
+        $whatsapp = null;
 
-        $response = $this->transactionWithReconnect(function () use ($request, $booking, &$email) {
+        $response = $this->transactionWithReconnect(function () use ($request, $booking, &$email, &$whatsapp) {
             $booking = Booking::with('slot')->lockForUpdate()->findOrFail($booking->id);
 
             if (!in_array($booking->status, $this->activeStatuses, true)) {
@@ -108,9 +113,11 @@ class BookingController extends Controller
                 'slot_id' => $newSlot->id,
                 'status' => 'rescheduled',
                 'rescheduled_at' => now(),
+                'reminder_sent_at' => null,
             ]);
             $this->notifyAdmins($booking, 'booking_rescheduled', 'Booking rescheduled', $booking->user->name . ' rescheduled to ' . $newSlot->date . ' from ' . $newSlot->start_time . ' to ' . $newSlot->end_time . '.');
             $email = $this->emailPayload($booking, 'Booking rescheduled', 'Your booking was rescheduled to ' . $newSlot->date . ' from ' . $newSlot->start_time . ' to ' . $newSlot->end_time . '.');
+            $whatsapp = ['type' => 'booking_rescheduled', 'booking_id' => $booking->id];
             ActivityLog::record('booking_rescheduled', 'Booking rescheduled', $booking->user->name . ' rescheduled a booking.', [
                 'user_id' => $booking->user_id,
                 'booking_id' => $booking->id,
@@ -121,6 +128,7 @@ class BookingController extends Controller
         });
 
         $this->sendEmailAfterResponse($email);
+        $this->sendWhatsAppAfterResponse($whatsapp);
 
         return $response;
     }
@@ -130,8 +138,9 @@ class BookingController extends Controller
         abort_unless($booking->user_id === $request->user()->id, 403);
 
         $email = null;
+        $whatsapp = null;
 
-        $response = $this->transactionWithReconnect(function () use ($booking, &$email) {
+        $response = $this->transactionWithReconnect(function () use ($booking, &$email, &$whatsapp) {
             $booking = Booking::with('slot', 'user')->lockForUpdate()->findOrFail($booking->id);
 
             if (!in_array($booking->status, $this->activeStatuses, true)) {
@@ -151,6 +160,7 @@ class BookingController extends Controller
             $bookingDate = $booking->slot?->date ?? 'an unavailable slot';
             $this->notifyAdmins($booking, 'booking_cancelled', 'Booking cancelled', $booking->user->name . ' cancelled a booking on ' . $bookingDate . '.');
             $email = $this->emailPayload($booking, 'Booking cancelled', 'Your booking on ' . $bookingDate . ' has been cancelled.');
+            $whatsapp = ['type' => 'booking_cancelled', 'booking_id' => $booking->id];
             ActivityLog::record('booking_cancelled', 'Booking cancelled', $booking->user->name . ' cancelled a booking.', [
                 'user_id' => $booking->user_id,
                 'booking_id' => $booking->id,
@@ -160,6 +170,7 @@ class BookingController extends Controller
         });
 
         $this->sendEmailAfterResponse($email);
+        $this->sendWhatsAppAfterResponse($whatsapp);
 
         return $response;
     }
@@ -529,6 +540,38 @@ class BookingController extends Controller
                 Log::warning('Booking email failed after response.', [
                     'to' => $email['to'],
                     'subject' => $email['subject'],
+                    'exception' => $exception->getMessage(),
+                ]);
+            }
+        });
+    }
+
+    private function sendWhatsAppAfterResponse(?array $whatsapp): void
+    {
+        if (!$whatsapp) {
+            return;
+        }
+
+        app()->terminating(function () use ($whatsapp) {
+            try {
+                $booking = Booking::with(['user', 'slot.location'])->find($whatsapp['booking_id']);
+
+                if (!$booking) {
+                    return;
+                }
+
+                $service = app(WhatsAppService::class);
+
+                match ($whatsapp['type']) {
+                    'booking_confirmed' => $service->sendBookingConfirmed($booking),
+                    'booking_rescheduled' => $service->sendBookingRescheduled($booking),
+                    'booking_cancelled' => $service->sendBookingCancelled($booking),
+                    default => false,
+                };
+            } catch (\Throwable $exception) {
+                Log::warning('Booking WhatsApp failed after response.', [
+                    'type' => $whatsapp['type'] ?? null,
+                    'booking_id' => $whatsapp['booking_id'] ?? null,
                     'exception' => $exception->getMessage(),
                 ]);
             }

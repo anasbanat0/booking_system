@@ -8,6 +8,7 @@ class BookingLocation extends Model
 {
     protected $fillable = [
         'name',
+        'slug',
         'default_capacity',
         'is_active',
     ];
@@ -25,4 +26,5 @@ class BookingLocation extends Model
     {
         return $this->hasMany(Slot::class);
     }
+
 }

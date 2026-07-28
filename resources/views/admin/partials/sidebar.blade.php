@@ -38,14 +38,16 @@
         ],
     ];
 
-    if (Auth::user()?->canManageAllBranches()) {
+    if (Auth::user()?->isAdminPanelUser()) {
         $adminLinks[] = [
             'label' => 'Homepage',
             'route' => 'admin.content.index',
             'active' => request()->routeIs('admin.content.*'),
             'icon' => 'M4 5a2 2 0 0 1 2-2h9l5 5v11a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V5Zm10 0v4h4l-4-4ZM7 13h10v-2H7v2Zm0 4h7v-2H7v2Z',
         ];
+    }
 
+    if (Auth::user()?->canManageAllBranches()) {
         $adminLinks[] = [
             'label' => 'Activity Log',
             'route' => 'admin.activity.index',
