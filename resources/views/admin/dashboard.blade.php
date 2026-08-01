@@ -28,6 +28,7 @@
         return str_pad($hour, 2, '0', STR_PAD_LEFT) . ':00';
     })->values();
     $peakHourTotals = $peakHours->pluck('total');
+    $hasDashboardFilters = request()->hasAny(['period', 'start_date', 'end_date', 'location_id']);
 @endphp
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -47,7 +48,7 @@
                 </p>
             </div>
 
-            <form method="GET" class="mt-5 grid gap-3 border-y border-slate-200 bg-white/70 py-4 sm:grid-cols-2 xl:grid-cols-[auto_160px_160px_220px_auto] xl:items-end">
+            <form method="GET" class="dashboard-filter-form mt-5 grid gap-3 border-y border-slate-200 bg-white/70 px-4 py-4 sm:grid-cols-2 lg:px-5">
                     <div>
                         <span class="text-xs font-bold uppercase tracking-wide text-slate-500">Range</span>
                         <div class="mt-1 grid grid-cols-3 overflow-hidden rounded-md border border-slate-300 bg-white text-sm font-bold">
@@ -79,7 +80,16 @@
                             Branch: {{ Auth::user()?->managedLocation?->name ?? 'Not assigned' }}
                         </div>
                     @endif
-                    <button name="period" value="custom" class="rounded-md bg-slate-950 px-4 py-2 text-sm font-bold text-white hover:bg-slate-800">Apply</button>
+                    <div class="flex flex-col gap-2 sm:flex-row">
+                        <button name="period" value="custom" class="inline-flex h-10 flex-1 items-center justify-center rounded-md bg-slate-950 px-4 text-sm font-bold text-white hover:bg-slate-800">
+                            Apply
+                        </button>
+                        @if($hasDashboardFilters)
+                            <a href="{{ route('admin.dashboard') }}" class="inline-flex h-10 flex-1 items-center justify-center rounded-md border border-slate-300 bg-white px-4 text-sm font-bold text-slate-700 hover:bg-slate-100">
+                                Clear
+                            </a>
+                        @endif
+                    </div>
                 </form>
         </div>
 

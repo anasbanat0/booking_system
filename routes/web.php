@@ -182,6 +182,10 @@ Route::middleware(['auth', 'admin'])->group(function () {
         ->name('admin.holidays.update');
     Route::delete('/admin/holidays/{holiday}', [AdminSlotSettingsController::class, 'destroyHoliday'])
         ->name('admin.holidays.destroy');
+    Route::post('/admin/closed-periods', [AdminSlotSettingsController::class, 'storeClosedPeriod'])
+        ->name('admin.closed-periods.store');
+    Route::delete('/admin/closed-periods/{closedPeriod}', [AdminSlotSettingsController::class, 'destroyClosedPeriod'])
+        ->name('admin.closed-periods.destroy');
 
     Route::get('/admin/content', [AdminSiteContentController::class, 'index'])->name('admin.content.index');
     Route::patch('/admin/content', [AdminSiteContentController::class, 'update'])->name('admin.content.update');

@@ -210,6 +210,97 @@
                 </div>
             </section>
 
+            <section class="mb-6 rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+                <div class="grid gap-6 lg:grid-cols-[1fr_1.2fr]">
+                    <div>
+                        <h2 class="text-lg font-bold text-slate-950">Close specific periods</h2>
+                        <p class="mt-1 text-sm text-slate-500">
+                            Close one or more time periods for a meeting, maintenance, or temporary branch pause.
+                        </p>
+
+                        <form method="POST" action="{{ route('admin.closed-periods.store') }}" class="mt-4 grid gap-3 sm:grid-cols-2">
+                            @csrf
+                            <label class="block">
+                                <span class="text-sm font-medium text-slate-700">Date</span>
+                                <input type="date" name="date" required class="mt-1 block w-full rounded-md border-slate-300 text-sm shadow-sm focus:border-blue-500 focus:ring-blue-500">
+                            </label>
+
+                            @if(Auth::user()?->canManageAllBranches())
+                                <label class="block">
+                                    <span class="text-sm font-medium text-slate-700">Branch</span>
+                                    <select name="booking_location_id" class="mt-1 block w-full rounded-md border-slate-300 text-sm shadow-sm focus:border-blue-500 focus:ring-blue-500">
+                                        <option value="">All branches</option>
+                                        @foreach($allLocations as $location)
+                                            <option value="{{ $location->id }}">{{ $location->name }}</option>
+                                        @endforeach
+                                    </select>
+                                </label>
+                            @endif
+
+                            <div class="sm:col-span-2">
+                                <span class="text-sm font-medium text-slate-700">Periods to close</span>
+                                <div class="mt-2 grid gap-2 sm:grid-cols-2">
+                                    @forelse($closurePeriods as $period)
+                                        <label class="flex items-center gap-2 rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-bold text-slate-700">
+                                            <input type="checkbox" name="periods[]" value="{{ $period->start_time }}|{{ $period->end_time }}" class="rounded border-slate-300 text-blue-600 shadow-sm focus:ring-blue-500">
+                                            {{ $period->start_time }} - {{ $period->end_time }}
+                                        </label>
+                                    @empty
+                                        <p class="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm font-bold text-amber-900">
+                                            Add active slot time templates first.
+                                        </p>
+                                    @endforelse
+                                </div>
+                            </div>
+
+                            <label class="block sm:col-span-2">
+                                <span class="text-sm font-medium text-slate-700">Reason</span>
+                                <input name="reason" placeholder="Meeting, maintenance, period closed..." class="mt-1 block w-full rounded-md border-slate-300 text-sm shadow-sm focus:border-blue-500 focus:ring-blue-500">
+                            </label>
+
+                            <div class="sm:col-span-2">
+                                <button class="rounded-md bg-slate-950 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800">
+                                    Close selected periods
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+
+                    <div class="rounded-lg border border-slate-200">
+                        <div class="border-b border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold text-slate-700">Upcoming closed periods</div>
+                        <div class="divide-y divide-slate-100">
+                            @forelse($closedPeriods as $closedPeriod)
+                                <div class="grid gap-3 px-4 py-3 sm:grid-cols-[1fr_auto] sm:items-center">
+                                    <div>
+                                        <p class="text-sm font-extrabold text-slate-950">
+                                            {{ \Carbon\Carbon::parse($closedPeriod->date)->format('M d, Y') }}
+                                            <span class="text-slate-400">/</span>
+                                            {{ $closedPeriod->start_time }} - {{ $closedPeriod->end_time }}
+                                        </p>
+                                        <p class="mt-1 text-xs font-bold text-slate-500">
+                                            {{ $closedPeriod->location?->name ?? 'All branches' }}
+                                            @if($closedPeriod->reason)
+                                                <span class="text-slate-300">|</span> {{ $closedPeriod->reason }}
+                                            @endif
+                                        </p>
+                                    </div>
+
+                                    <form method="POST" action="{{ route('admin.closed-periods.destroy', $closedPeriod) }}" onsubmit="return confirm('Delete this closed period? Existing inactive slots will stay inactive until regenerated.');">
+                                        @csrf
+                                        @method('DELETE')
+                                        <button class="rounded-md border border-rose-200 px-3 py-2 text-sm font-bold text-rose-700 hover:bg-rose-50">
+                                            Delete
+                                        </button>
+                                    </form>
+                                </div>
+                            @empty
+                                <div class="px-4 py-8 text-center text-sm text-slate-500">No closed periods yet.</div>
+                            @endforelse
+                        </div>
+                    </div>
+                </div>
+            </section>
+
             <div class="grid grid-cols-1 gap-6 xl:grid-cols-2">
                 @foreach($locations as $location)
                     <section class="rounded-lg border border-slate-200 bg-white shadow-sm">

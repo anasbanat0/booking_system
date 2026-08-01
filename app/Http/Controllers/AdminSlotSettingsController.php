@@ -4,7 +4,9 @@ namespace App\Http\Controllers;
 
 use App\Models\BookingLocation;
 use App\Models\BookingRule;
+use App\Models\ClosedPeriod;
 use App\Models\Holiday;
+use App\Models\Slot;
 use App\Models\SlotTemplate;
 use Illuminate\Http\Request;
 
@@ -25,6 +27,22 @@ class AdminSlotSettingsController extends Controller
             ->whereDate('date', '>=', now()->subDays(7)->toDateString())
             ->orderBy('date')
             ->get();
+        $closedPeriods = ClosedPeriod::with('location')
+            ->when(!request()->user()->canManageAllBranches(), function ($query) {
+                $query->where('booking_location_id', request()->user()->booking_location_id);
+            })
+            ->whereDate('date', '>=', now()->subDays(7)->toDateString())
+            ->orderBy('date')
+            ->orderBy('start_time')
+            ->get();
+        $closurePeriods = SlotTemplate::query()
+            ->select('start_time', 'end_time')
+            ->distinct()
+            ->when(!request()->user()->canManageAllBranches(), function ($query) {
+                $query->where('booking_location_id', request()->user()->booking_location_id);
+            })
+            ->orderBy('start_time')
+            ->get();
 
         $bookingRules = BookingRule::current();
 
@@ -32,6 +50,8 @@ class AdminSlotSettingsController extends Controller
             'locations' => $visibleLocations,
             'allLocations' => $locations,
             'holidays' => $holidays,
+            'closedPeriods' => $closedPeriods,
+            'closurePeriods' => $closurePeriods,
             'bookingRules' => $bookingRules,
         ]);
     }
@@ -219,11 +239,110 @@ class AdminSlotSettingsController extends Controller
         return back()->with('success', 'Closed day deleted successfully.');
     }
 
+    public function storeClosedPeriod(Request $request)
+    {
+        $validated = $request->validate([
+            'date' => ['required', 'date'],
+            'booking_location_id' => ['nullable', 'exists:booking_locations,id'],
+            'periods' => ['required', 'array', 'min:1'],
+            'periods.*' => ['required', 'string'],
+            'reason' => ['nullable', 'string', 'max:255'],
+        ]);
+
+        $locationId = $request->user()->canManageAllBranches()
+            ? ($validated['booking_location_id'] ?? null)
+            : $request->user()->booking_location_id;
+
+        foreach ($validated['periods'] as $period) {
+            [$startTime, $endTime] = array_pad(explode('|', $period, 2), 2, null);
+
+            if (!$startTime || !$endTime) {
+                continue;
+            }
+
+            $closedPeriod = ClosedPeriod::updateOrCreate(
+                [
+                    'booking_location_id' => $locationId,
+                    'date' => $validated['date'],
+                    'start_time' => $startTime,
+                    'end_time' => $endTime,
+                ],
+                [
+                    'reason' => $validated['reason'] ?? 'Period closed',
+                ]
+            );
+
+            $this->deactivateClosedSlots($closedPeriod);
+        }
+
+        return back()->with('success', 'Closed period added successfully.');
+    }
+
+    public function destroyClosedPeriod(Request $request, ClosedPeriod $closedPeriod)
+    {
+        if (!$request->user()->canManageAllBranches()) {
+            abort_unless((int) $closedPeriod->booking_location_id === (int) $request->user()->booking_location_id, 403);
+        }
+
+        $date = $closedPeriod->date;
+        $locationId = $closedPeriod->booking_location_id;
+        $startTime = $closedPeriod->start_time;
+        $endTime = $closedPeriod->end_time;
+
+        $closedPeriod->delete();
+        $this->reactivateOpenSlots($date, $locationId, $startTime, $endTime);
+
+        return back()->with('success', 'Closed period deleted successfully.');
+    }
+
     private function authorizeBranchAccess(Request $request, int $locationId): void
     {
         abort_unless(
             $request->user()->canManageAllBranches() || (int) $request->user()->booking_location_id === $locationId,
             403
         );
+    }
+
+    private function deactivateClosedSlots(ClosedPeriod $closedPeriod): void
+    {
+        Slot::query()
+            ->whereDate('date', $closedPeriod->date)
+            ->when($closedPeriod->booking_location_id, function ($query) use ($closedPeriod) {
+                $query->where('booking_location_id', $closedPeriod->booking_location_id);
+            })
+            ->whereTime('start_time', '<', $closedPeriod->end_time)
+            ->whereTime('end_time', '>', $closedPeriod->start_time)
+            ->update(['is_active' => false]);
+    }
+
+    private function reactivateOpenSlots(string $date, ?int $locationId, string $startTime, string $endTime): void
+    {
+        Slot::query()
+            ->whereDate('date', $date)
+            ->when($locationId, fn ($query) => $query->where('booking_location_id', $locationId))
+            ->whereTime('start_time', '<', $endTime)
+            ->whereTime('end_time', '>', $startTime)
+            ->get()
+            ->each(function (Slot $slot) {
+                $hasHoliday = Holiday::whereDate('date', $slot->date)
+                    ->where(function ($query) use ($slot) {
+                        $query->whereNull('booking_location_id')
+                            ->orWhere('booking_location_id', $slot->booking_location_id);
+                    })
+                    ->exists();
+
+                $hasClosedPeriod = ClosedPeriod::whereDate('date', $slot->date)
+                    ->where(function ($query) use ($slot) {
+                        $query->whereNull('booking_location_id')
+                            ->orWhere('booking_location_id', $slot->booking_location_id);
+                    })
+                    ->whereTime('start_time', '<', $slot->end_time)
+                    ->whereTime('end_time', '>', $slot->start_time)
+                    ->exists();
+
+                if (!$hasHoliday && !$hasClosedPeriod) {
+                    $slot->update(['is_active' => true]);
+                }
+            });
     }
 }

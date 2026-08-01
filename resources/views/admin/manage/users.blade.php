@@ -29,12 +29,13 @@
                             @endforeach
                         </select>
                         <select name="booking_location_id" class="rounded-md border-slate-300 text-sm shadow-sm focus:border-blue-500 focus:ring-blue-500">
-                            <option value="">No branch / all branches</option>
+                            <option value="">Admin only: no branch</option>
                             @foreach($locations as $location)
                                 <option value="{{ $location->id }}" @selected(Auth::user()?->role === 'staff')>{{ $location->name }}</option>
                             @endforeach
                         </select>
                         <input name="password" placeholder="Password, default: password" class="rounded-md border-slate-300 text-sm shadow-sm focus:border-blue-500 focus:ring-blue-500">
+                        <p class="md:col-span-3 -mt-2 text-xs font-bold text-slate-500">Branch is required for Student and Staff users. Only Admin can stay without branch.</p>
                         <div class="md:col-span-3">
                             <button class="rounded-md bg-slate-950 px-4 py-2 text-sm font-bold text-white hover:bg-slate-800">Add user</button>
                         </div>
@@ -76,6 +77,9 @@
                             @endforeach
                         </select>
                         <button class="rounded-md bg-slate-950 px-4 py-2 text-sm font-bold text-white hover:bg-slate-800">Filter</button>
+                        @if(request()->hasAny(['search', 'role']))
+                            <a href="{{ route('admin.manage.users.index') }}" class="inline-flex items-center justify-center rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-bold text-slate-700 hover:bg-slate-100">Clear</a>
+                        @endif
                         <button type="button" data-open-modal="bulk-delete-modal" class="rounded-md border border-rose-200 px-4 py-2 text-sm font-bold text-rose-700 hover:bg-rose-50">Delete selected</button>
                     </form>
                 </div>
@@ -104,7 +108,15 @@
                                     </td>
                                     <td class="px-5 py-4 text-sm text-slate-700">{{ $user->phone ?? '-' }}</td>
                                     <td class="px-5 py-4 text-sm font-semibold text-slate-700">{{ ucfirst($user->role) }}</td>
-                                    <td class="px-5 py-4 text-sm text-slate-700">{{ $user->managedLocation?->name ?? 'All / none' }}</td>
+                                    <td class="px-5 py-4 text-sm text-slate-700">
+                                        @if($user->managedLocation)
+                                            {{ $user->managedLocation->name }}
+                                        @elseif($user->role === 'admin')
+                                            Admin / all branches
+                                        @else
+                                            <span class="rounded-full bg-rose-50 px-2.5 py-1 text-xs font-bold text-rose-700 ring-1 ring-rose-200">Branch required</span>
+                                        @endif
+                                    </td>
                                     <td class="px-5 py-4">
                                         <div class="flex justify-end gap-2">
                                             <button type="button" data-open-modal="edit-user-{{ $user->id }}" class="rounded-md border border-slate-300 px-3 py-2 text-sm font-bold text-slate-700 hover:bg-slate-100">Edit</button>
@@ -168,11 +180,12 @@
                     @endforeach
                 </select>
                 <select name="booking_location_id" class="rounded-md border-slate-300 text-sm">
-                    <option value="">All / none</option>
+                    <option value="">Admin only: no branch</option>
                     @foreach($locations as $location)
                         <option value="{{ $location->id }}" @selected($user->booking_location_id === $location->id)>{{ $location->name }}</option>
                     @endforeach
                 </select>
+                <p class="md:col-span-2 -mt-2 text-xs font-bold text-slate-500">Branch is required when role is Student or Staff.</p>
                 <input name="password" placeholder="New password" class="rounded-md border-slate-300 text-sm">
                 <div class="md:col-span-2 flex justify-end gap-2">
                     <button type="button" data-close-modal class="rounded-md border border-slate-300 px-4 py-2 text-sm font-bold text-slate-700">Cancel</button>
@@ -233,5 +246,23 @@ document.getElementById('select-all-users')?.addEventListener('change', event =>
         checkbox.checked = event.target.checked;
     });
 });
+
+function syncBranchRequirement(form) {
+    const role = form.querySelector('select[name="role"]');
+    const branch = form.querySelector('select[name="booking_location_id"]');
+
+    if (!role || !branch) {
+        return;
+    }
+
+    const update = () => {
+        branch.required = role.value === 'student' || role.value === 'staff';
+    };
+
+    role.addEventListener('change', update);
+    update();
+}
+
+document.querySelectorAll('form').forEach(syncBranchRequirement);
 </script>
 @endsection

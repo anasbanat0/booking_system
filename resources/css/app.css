@@ -248,6 +248,13 @@
         overflow-wrap: anywhere;
     }
 
+    @media (min-width: 1100px) {
+        .dashboard-filter-form {
+            align-items: end;
+            grid-template-columns: minmax(320px, 1.45fr) minmax(145px, 0.75fr) minmax(145px, 0.75fr) minmax(220px, 1fr) minmax(210px, 0.85fr) !important;
+        }
+    }
+
     .supporter-carousel {
         --supporter-gap: 1rem;
         --supporter-card-width: 13.5rem;

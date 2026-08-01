@@ -56,7 +56,7 @@ class AdminManageUserController extends Controller
             'email' => ['required', 'email', 'max:255', Rule::unique('users', 'email')->whereNull('deleted_at')],
             'phone' => ['nullable', 'string', 'max:40', Rule::unique('users', 'phone')->whereNull('deleted_at')],
             'role' => ['required', Rule::in($request->user()->canManageAllBranches() ? ['student', 'staff', 'admin'] : ['student'])],
-            'booking_location_id' => ['nullable', 'exists:booking_locations,id'],
+            'booking_location_id' => ['nullable', 'required_if:role,student,staff', 'exists:booking_locations,id'],
             'password' => ['nullable', 'string', 'min:6'],
         ]);
 
@@ -90,7 +90,7 @@ class AdminManageUserController extends Controller
             'email' => ['required', 'email', 'max:255', Rule::unique('users', 'email')->ignore($user->id)],
             'phone' => ['nullable', 'string', 'max:40', Rule::unique('users', 'phone')->ignore($user->id)],
             'role' => ['required', Rule::in($request->user()->canManageAllBranches() ? ['student', 'staff', 'admin'] : ['student'])],
-            'booking_location_id' => ['nullable', 'exists:booking_locations,id'],
+            'booking_location_id' => ['nullable', 'required_if:role,student,staff', 'exists:booking_locations,id'],
             'password' => ['nullable', 'string', 'min:6'],
         ]);
 
@@ -172,6 +172,7 @@ class AdminManageUserController extends Controller
         $skipped = 0;
         $skippedRows = [];
         $outsideBranchDuplicates = 0;
+        $missingBranchRows = 0;
 
         while (($row = fgetcsv($handle)) !== false) {
             $row = array_slice(array_pad($row, count($header), null), 0, count($header));
@@ -210,6 +211,13 @@ class AdminManageUserController extends Controller
                 ? ($locations[strtolower(trim($data['branch'] ?? ''))] ?? null)
                 : $request->user()->booking_location_id;
 
+            if ($role !== 'admin' && !$branchId) {
+                $skipped++;
+                $missingBranchRows++;
+                $skippedRows[] = $email;
+                continue;
+            }
+
             $user = User::create([
                 'name' => trim($data['name']),
                 'email' => $email,
@@ -239,6 +247,10 @@ class AdminManageUserController extends Controller
 
         if ($outsideBranchDuplicates > 0) {
             $message .= ' ' . $outsideBranchDuplicates . ' student(s) already exist in another branch. To add or move them into your branch, please contact the main admin.';
+        }
+
+        if ($missingBranchRows > 0) {
+            $message .= ' ' . $missingBranchRows . ' student/staff row(s) skipped because branch is required.';
         }
 
         return back()->with($skipped > 0 ? 'warning' : 'success', $message);
@@ -323,6 +335,12 @@ class AdminManageUserController extends Controller
 
         if (!$request->user()->canManageAllBranches()) {
             return $request->user()->booking_location_id;
+        }
+
+        if (!$branchId) {
+            throw \Illuminate\Validation\ValidationException::withMessages([
+                'booking_location_id' => 'Branch is required for students and staff.',
+            ]);
         }
 
         return $branchId;

@@ -17,6 +17,8 @@
         'cancelled' => 'Cancelled',
         'rescheduled' => 'Rescheduled',
     ];
+    $statsRangeQuery = request()->only(['stats_period', 'stats_start_date', 'stats_end_date', 'location_id']);
+    $hasStatsRangeFilters = request()->hasAny(['stats_period', 'stats_start_date', 'stats_end_date']);
 @endphp
 
 <div class="min-h-screen bg-slate-50 lg:flex">
@@ -35,9 +37,52 @@
             </div>
         </div>
 
+        <form method="GET" class="mb-4 grid gap-3 border-y border-slate-200 bg-white/70 px-4 py-4 sm:grid-cols-2 xl:grid-cols-[minmax(330px,1.35fr)_minmax(170px,0.75fr)_minmax(170px,0.75fr)_minmax(210px,0.85fr)] xl:items-end">
+            @foreach(request()->except(['page', 'stats_period', 'stats_start_date', 'stats_end_date']) as $key => $value)
+                @if(is_array($value))
+                    @foreach($value as $item)
+                        <input type="hidden" name="{{ $key }}[]" value="{{ $item }}">
+                    @endforeach
+                @else
+                    <input type="hidden" name="{{ $key }}" value="{{ $value }}">
+                @endif
+            @endforeach
+
+            <div>
+                <span class="text-xs font-bold uppercase tracking-wide text-slate-500">Stats Range</span>
+                <div class="mt-1 grid grid-cols-3 overflow-hidden rounded-md border border-slate-300 bg-white text-sm font-bold">
+                    <button type="submit" name="stats_period" value="today" class="px-3 py-2 {{ $statsRangePeriod === 'today' ? 'bg-slate-950 text-white' : 'text-slate-600 hover:bg-slate-50' }}">Today</button>
+                    <button type="submit" name="stats_period" value="week" class="border-x border-slate-300 px-3 py-2 {{ $statsRangePeriod === 'week' ? 'bg-slate-950 text-white' : 'text-slate-600 hover:bg-slate-50' }}">Week</button>
+                    <button type="submit" name="stats_period" value="month" class="px-3 py-2 {{ $statsRangePeriod === 'month' ? 'bg-slate-950 text-white' : 'text-slate-600 hover:bg-slate-50' }}">Month</button>
+                </div>
+            </div>
+            <label class="block">
+                <span class="text-xs font-bold uppercase tracking-wide text-slate-500">From</span>
+                <input type="date" name="stats_start_date" value="{{ $statsStartDate->toDateString() }}" class="mt-1 block w-full rounded-md border-slate-300 text-sm">
+            </label>
+            <label class="block">
+                <span class="text-xs font-bold uppercase tracking-wide text-slate-500">To</span>
+                <input type="date" name="stats_end_date" value="{{ $statsEndDate->toDateString() }}" class="mt-1 block w-full rounded-md border-slate-300 text-sm">
+            </label>
+            <div class="flex flex-col gap-2 sm:flex-row">
+                <button name="stats_period" value="custom" class="inline-flex h-10 flex-1 items-center justify-center rounded-md bg-slate-950 px-4 text-sm font-bold text-white hover:bg-slate-800">
+                    Apply
+                </button>
+                @if($hasStatsRangeFilters)
+                    <a href="{{ route('admin.bookings.index', request()->except(['page', 'stats_period', 'stats_start_date', 'stats_end_date'])) }}" class="inline-flex h-10 flex-1 items-center justify-center rounded-md border border-slate-300 bg-white px-4 text-sm font-bold text-slate-700 hover:bg-slate-100">
+                        Clear
+                    </a>
+                @endif
+            </div>
+        </form>
+
+        <p class="mb-3 text-sm font-semibold text-slate-500">
+            Stats shown for {{ $statsStartDate->format('M d, Y') }} - {{ $statsEndDate->format('M d, Y') }}
+        </p>
+
         <div class="mb-6 grid grid-cols-2 gap-3 md:grid-cols-5">
             @foreach($statuses as $status)
-                <a href="{{ route('admin.bookings.index', array_merge(request()->except('page'), ['status' => $status])) }}"
+                <a href="{{ route('admin.bookings.index', array_merge(request()->except('page'), $statsRangeQuery, ['status' => $status])) }}"
                    class="rounded-lg border {{ request('status') === $status ? 'border-slate-950 bg-white' : 'border-slate-200 bg-white hover:border-slate-300' }} p-4 shadow-sm">
                     <p class="text-xs font-semibold uppercase tracking-wide text-slate-500">{{ $statusLabels[$status] }}</p>
                     <p class="mt-2 text-2xl font-bold text-slate-950">{{ number_format($statusCounts[$status] ?? 0) }}</p>

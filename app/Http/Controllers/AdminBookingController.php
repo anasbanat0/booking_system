@@ -8,6 +8,7 @@ use App\Models\AdminNotification;
 use App\Models\BookingLocation;
 use App\Models\Slot;
 use App\Models\User;
+use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -26,6 +27,27 @@ class AdminBookingController extends Controller
         $selectedLocationId = $request->user()->canManageAllBranches()
             ? $request->integer('location_id') ?: null
             : $request->user()->booking_location_id;
+        $statsRangePeriod = in_array($request->input('stats_period'), ['today', 'week', 'month', 'custom'], true)
+            ? $request->input('stats_period')
+            : 'week';
+        $statsStartDate = $request->filled('stats_start_date')
+            ? Carbon::parse($request->stats_start_date)->startOfDay()
+            : now()->copy()->startOfWeek(Carbon::SATURDAY)->startOfDay();
+        $statsEndDate = $request->filled('stats_end_date')
+            ? Carbon::parse($request->stats_end_date)->endOfDay()
+            : now()->copy()->endOfWeek(Carbon::FRIDAY)->endOfDay();
+
+        if ($statsRangePeriod !== 'custom') {
+            [$statsStartDate, $statsEndDate] = match ($statsRangePeriod) {
+                'today' => [now()->startOfDay(), now()->endOfDay()],
+                'month' => [now()->startOfMonth()->startOfDay(), now()->endOfMonth()->endOfDay()],
+                default => [now()->copy()->startOfWeek(Carbon::SATURDAY)->startOfDay(), now()->copy()->endOfWeek(Carbon::FRIDAY)->endOfDay()],
+            };
+        }
+
+        if ($statsStartDate->gt($statsEndDate)) {
+            [$statsStartDate, $statsEndDate] = [$statsEndDate->copy()->startOfDay(), $statsStartDate->copy()->endOfDay()];
+        }
 
         $query->when($selectedLocationId, function ($bookingQuery) use ($selectedLocationId) {
             $bookingQuery->whereHas('slot', fn ($slotQuery) => $slotQuery->where('booking_location_id', $selectedLocationId));
@@ -57,8 +79,9 @@ class AdminBookingController extends Controller
 
         $bookings = $query->latest()->paginate(10)->withQueryString();
         $statusCounts = Booking::selectRaw('status, count(*) as total')
-            ->when($selectedLocationId, function ($countQuery) use ($selectedLocationId) {
-                $countQuery->whereHas('slot', fn ($slotQuery) => $slotQuery->where('booking_location_id', $selectedLocationId));
+            ->whereHas('slot', function ($slotQuery) use ($selectedLocationId, $statsStartDate, $statsEndDate) {
+                $slotQuery->whereBetween('date', [$statsStartDate->toDateString(), $statsEndDate->toDateString()])
+                    ->when($selectedLocationId, fn ($branchQuery) => $branchQuery->where('booking_location_id', $selectedLocationId));
             })
             ->groupBy('status')
             ->pluck('total', 'status');
@@ -86,7 +109,19 @@ class AdminBookingController extends Controller
             ->orderBy('start_time')
             ->get();
 
-        return view('admin.bookings.index', compact('bookings', 'statuses', 'statusCounts', 'users', 'slots', 'periods', 'locations', 'selectedLocationId'));
+        return view('admin.bookings.index', compact(
+            'bookings',
+            'statuses',
+            'statusCounts',
+            'users',
+            'slots',
+            'periods',
+            'locations',
+            'selectedLocationId',
+            'statsRangePeriod',
+            'statsStartDate',
+            'statsEndDate'
+        ));
     }
 
     public function storeManual(Request $request)

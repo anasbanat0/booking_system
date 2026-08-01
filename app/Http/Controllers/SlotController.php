@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Slot;
+use App\Models\ClosedPeriod;
 use App\Models\Holiday;
 use App\Models\SlotTemplate;
 use Carbon\Carbon;
@@ -51,6 +52,19 @@ class SlotController extends Controller
                     ->exists();
 
                 if ($isHoliday) {
+                    continue;
+                }
+
+                $isClosedPeriod = ClosedPeriod::where('date', $date->toDateString())
+                    ->where(function ($query) use ($template) {
+                        $query->whereNull('booking_location_id')
+                            ->orWhere('booking_location_id', $template->booking_location_id);
+                    })
+                    ->whereTime('start_time', '<', $template->end_time)
+                    ->whereTime('end_time', '>', $template->start_time)
+                    ->exists();
+
+                if ($isClosedPeriod) {
                     continue;
                 }
 
