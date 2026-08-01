@@ -82,39 +82,6 @@
             @endif
 
             <section class="mb-6 rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
-                <div class="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-                    <div>
-                        <h2 class="text-lg font-bold text-slate-950">Generate Booking Slots</h2>
-                        <p class="mt-1 text-sm text-slate-500">
-                            Creates daily slots from the active branch time templates and skips Fridays and holidays.
-                        </p>
-                    </div>
-
-                    <form method="POST" action="{{ route('slots.generate') }}" class="grid gap-3 sm:grid-cols-[180px_120px_auto]">
-                        @csrf
-
-                        <label class="block">
-                            <span class="text-sm font-medium text-slate-700">Start date</span>
-                            <input type="date" name="start_date" required
-                                   class="mt-1 block w-full rounded-md border-slate-300 text-sm shadow-sm focus:border-blue-500 focus:ring-blue-500">
-                        </label>
-
-                        <label class="block">
-                            <span class="text-sm font-medium text-slate-700">Days</span>
-                            <input type="number" name="days" value="7" min="1" max="30"
-                                   class="mt-1 block w-full rounded-md border-slate-300 text-sm shadow-sm focus:border-blue-500 focus:ring-blue-500">
-                        </label>
-
-                        <div class="flex items-end">
-                            <button class="h-10 rounded-md bg-slate-950 px-4 text-sm font-semibold text-white hover:bg-slate-800">
-                                Generate
-                            </button>
-                        </div>
-                    </form>
-                </div>
-            </section>
-
-            <section class="mb-6 rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
                 <div class="grid gap-6 lg:grid-cols-[1fr_1.2fr]">
                     <div>
                         <h2 class="text-lg font-bold text-slate-950">Close hub / off day</h2>

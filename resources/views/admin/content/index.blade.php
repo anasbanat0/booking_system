@@ -102,7 +102,7 @@
                             'hub_buttons_description' => 'Hub buttons description',
                             'stat_students_label' => 'Students stat label',
                             'stat_bookings_label' => 'Bookings stat label',
-                            'stat_seats_label' => 'Seats stat label',
+                            'stat_seats_label' => 'Study hours stat label',
                             'stat_branches_label' => 'Branches stat label',
                         ] as $key => $label)
                             <label class="block">
@@ -262,6 +262,7 @@
                                 'primary_cta_guest' => 'Guest CTA button',
                                 'primary_cta_auth' => 'Authenticated CTA button',
                                 'partners_heading' => 'Partners heading',
+                                'legacy_bookings' => 'Legacy bookings',
                             ];
                         @endphp
 

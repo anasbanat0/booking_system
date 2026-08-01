@@ -45,6 +45,38 @@ class User extends Authenticatable
         return in_array($this->role, ['admin', 'staff'], true);
     }
 
+    public function currentBookingWarningReason(): ?string
+    {
+        $monthStart = now()->startOfMonth()->toDateString();
+        $monthEnd = now()->endOfMonth()->toDateString();
+
+        $cancelledCount = $this->bookings()
+            ->where('status', 'cancelled')
+            ->whereHas('slot', fn ($query) => $query->whereBetween('date', [$monthStart, $monthEnd]))
+            ->count();
+
+        $noShowCount = $this->bookings()
+            ->where('status', 'no_show')
+            ->whereHas('slot', fn ($query) => $query->whereBetween('date', [$monthStart, $monthEnd]))
+            ->count();
+
+        if ($cancelledCount < 3 && $noShowCount < 3) {
+            return null;
+        }
+
+        $reasons = [];
+
+        if ($cancelledCount >= 3) {
+            $reasons[] = '3 cancellations this month';
+        }
+
+        if ($noShowCount >= 3) {
+            $reasons[] = '3 no-shows this month';
+        }
+
+        return implode(' and ', $reasons);
+    }
+
     public function sendPasswordResetNotification($token): void
     {
         $this->notify(new ResetPassword($token));

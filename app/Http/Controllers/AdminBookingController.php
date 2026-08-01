@@ -258,15 +258,26 @@ class AdminBookingController extends Controller
 
     private function refreshUserWarning(Booking $booking): void
     {
+        $monthStart = now()->startOfMonth()->toDateString();
+        $monthEnd = now()->endOfMonth()->toDateString();
+
         $cancelledCount = Booking::where('user_id', $booking->user_id)
             ->where('status', 'cancelled')
+            ->whereHas('slot', fn ($query) => $query->whereBetween('date', [$monthStart, $monthEnd]))
             ->count();
 
         $noShowCount = Booking::where('user_id', $booking->user_id)
             ->where('status', 'no_show')
+            ->whereHas('slot', fn ($query) => $query->whereBetween('date', [$monthStart, $monthEnd]))
             ->count();
 
         if ($cancelledCount < 3 && $noShowCount < 3) {
+            $booking->user?->update([
+                'booking_warning_count' => 0,
+                'booking_warning_reason' => null,
+                'booking_warning_at' => null,
+            ]);
+
             return;
         }
 

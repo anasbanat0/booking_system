@@ -11,10 +11,7 @@
     ];
 
     $activeStatuses = ['booked', 'rescheduled'];
-    $selectedType = request('type', 'upcoming');
-    $upcomingBookings = $bookings->filter(fn ($booking) => $booking->slot && in_array($booking->status, $activeStatuses, true) && \Carbon\Carbon::parse($booking->slot->date)->endOfDay()->isFuture());
-    $historyBookings = $bookings->reject(fn ($booking) => $upcomingBookings->contains('id', $booking->id));
-    $visibleBookings = $selectedType === 'history' ? $historyBookings : $upcomingBookings;
+    $accountNotice = Auth::user()?->currentBookingWarningReason();
 @endphp
 
 <div class="min-h-screen bg-[#f6f7f4]">
@@ -35,10 +32,10 @@
             </div>
         </div>
 
-        @if(Auth::user()?->booking_warning_at)
+        @if($accountNotice)
             <div class="mb-6 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
                 <span class="font-bold">Account notice:</span>
-                {{ Auth::user()->booking_warning_reason }}
+                {{ $accountNotice }}
             </div>
         @endif
 
@@ -55,7 +52,7 @@
             </div>
             <div class="rounded-lg border border-stone-200 bg-white p-4 shadow-sm">
                 <p class="text-xs font-extrabold uppercase tracking-wide text-stone-500">Warning status</p>
-                <p class="mt-2 text-sm font-bold text-stone-950">{{ Auth::user()?->booking_warning_reason ?? 'No violations' }}</p>
+                <p class="mt-2 text-sm font-bold text-stone-950">{{ $accountNotice ?? 'No violations this month' }}</p>
                 <p class="mt-1 text-xs text-stone-500">Reschedule cutoff: {{ $remaining['rescheduleCutoffHours'] }} hours</p>
             </div>
         </div>
@@ -64,17 +61,17 @@
             <a href="{{ route('bookings.my', ['type' => 'upcoming']) }}"
                class="flex-1 rounded-md px-4 py-2 text-center text-sm font-extrabold {{ $selectedType === 'upcoming' ? 'bg-stone-950 text-white' : 'text-stone-600 hover:bg-stone-100' }}">
                 Upcoming
-                <span class="ms-1 rounded-full bg-white/15 px-2 py-0.5 text-xs">{{ $upcomingBookings->count() }}</span>
+                <span class="ms-1 rounded-full bg-white/15 px-2 py-0.5 text-xs">{{ $upcomingBookingsCount }}</span>
             </a>
             <a href="{{ route('bookings.my', ['type' => 'history']) }}"
                class="flex-1 rounded-md px-4 py-2 text-center text-sm font-extrabold {{ $selectedType === 'history' ? 'bg-stone-950 text-white' : 'text-stone-600 hover:bg-stone-100' }}">
                 History
-                <span class="ms-1 rounded-full bg-white/15 px-2 py-0.5 text-xs">{{ $historyBookings->count() }}</span>
+                <span class="ms-1 rounded-full bg-white/15 px-2 py-0.5 text-xs">{{ $historyBookingsCount }}</span>
             </a>
         </div>
 
         <section class="overflow-hidden rounded-lg border border-stone-200 bg-white shadow-sm">
-            @if($visibleBookings->isEmpty())
+            @if($visibleBookings->count() === 0)
                 <div class="px-6 py-16 text-center">
                     <p class="text-xl font-extrabold text-stone-950">No {{ $selectedType }} bookings</p>
                     <p class="mt-2 text-sm text-stone-500">Your bookings will appear here once you reserve a weekly slot.</p>
@@ -159,6 +156,12 @@
                         </article>
                     @endforeach
                 </div>
+
+                @if($visibleBookings->hasPages())
+                    <div class="border-t border-stone-200 px-5 py-4">
+                        {{ $visibleBookings->links() }}
+                    </div>
+                @endif
             @endif
         </section>
     </div>

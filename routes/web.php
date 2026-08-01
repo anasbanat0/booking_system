@@ -10,7 +10,6 @@ use App\Http\Controllers\AdminActivityLogController;
 use App\Http\Controllers\BookingController;
 use App\Http\Controllers\CalendarController;
 use App\Http\Controllers\ProfileController;
-use App\Http\Controllers\SlotController;
 use App\Models\Booking;
 use App\Models\BookingLocation;
 use App\Models\SiteContent;
@@ -165,7 +164,6 @@ Route::middleware(['auth', 'admin'])->group(function () {
     Route::get('/admin/activity', [AdminActivityLogController::class, 'index'])->name('admin.activity.index');
 
     Route::get('/admin/slots', [AdminSlotSettingsController::class, 'index'])->name('admin.slots.index');
-    Route::post('/admin/generate-slots', [SlotController::class, 'generate'])->name('slots.generate');
     Route::patch('/admin/locations/{location}', [AdminSlotSettingsController::class, 'updateLocation'])
         ->name('admin.locations.update');
     Route::patch('/admin/booking-rules', [AdminSlotSettingsController::class, 'updateRules'])

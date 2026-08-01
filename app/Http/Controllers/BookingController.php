@@ -177,10 +177,45 @@ class BookingController extends Controller
 
     public function myBookings(Request $request)
     {
-        $bookings = Booking::with('slot.location')
-            ->where('user_id', $request->user()->id)
+        $selectedType = in_array($request->input('type', 'upcoming'), ['upcoming', 'history'], true)
+            ? $request->input('type', 'upcoming')
+            : 'upcoming';
+
+        $baseBookingsQuery = Booking::with('slot.location')
+            ->where('user_id', $request->user()->id);
+
+        $upcomingBookingsQuery = (clone $baseBookingsQuery)
+            ->whereIn('status', $this->activeStatuses)
+            ->whereHas('slot', function ($query) {
+                $query->where(function ($dateQuery) {
+                    $dateQuery->whereDate('date', '>', now()->toDateString())
+                        ->orWhere(function ($todayQuery) {
+                            $todayQuery->whereDate('date', now()->toDateString())
+                                ->whereTime('start_time', '>', now()->format('H:i:s'));
+                        });
+                });
+            });
+
+        $historyBookingsQuery = (clone $baseBookingsQuery)
+            ->where(function ($query) {
+                $query->whereNotIn('status', $this->activeStatuses)
+                    ->orWhereDoesntHave('slot')
+                    ->orWhereHas('slot', function ($slotQuery) {
+                        $slotQuery->whereDate('date', '<', now()->toDateString())
+                            ->orWhere(function ($todayQuery) {
+                                $todayQuery->whereDate('date', now()->toDateString())
+                                    ->whereTime('start_time', '<=', now()->format('H:i:s'));
+                            });
+                    });
+            });
+
+        $upcomingBookingsCount = (clone $upcomingBookingsQuery)->count();
+        $historyBookingsCount = (clone $historyBookingsQuery)->count();
+
+        $visibleBookings = ($selectedType === 'history' ? $historyBookingsQuery : $upcomingBookingsQuery)
             ->orderByDesc('created_at')
-            ->get();
+            ->paginate(15)
+            ->withQueryString();
 
         $availableSlots = Slot::with('location')
             ->where('is_active', true)
@@ -229,7 +264,14 @@ class BookingController extends Controller
             'rescheduleCutoffHours' => $bookingRules->reschedule_cutoff_hours,
         ];
 
-        return view('bookings.my', compact('bookings', 'availableSlots', 'remaining'));
+        return view('bookings.my', compact(
+            'availableSlots',
+            'remaining',
+            'selectedType',
+            'visibleBookings',
+            'upcomingBookingsCount',
+            'historyBookingsCount',
+        ));
     }
 
     private function validateNewBooking(int $userId, Slot $slot): void
@@ -469,17 +511,32 @@ class BookingController extends Controller
 
     private function refreshUserWarning($user): void
     {
+        $monthStart = now()->startOfMonth()->toDateString();
+        $monthEnd = now()->endOfMonth()->toDateString();
+
         $cancelledCount = Booking::where('user_id', $user->id)
             ->where('status', 'cancelled')
+            ->whereHas('slot', fn ($query) => $query->whereBetween('date', [$monthStart, $monthEnd]))
             ->count();
 
         $noShowCount = Booking::where('user_id', $user->id)
             ->where('status', 'no_show')
+            ->whereHas('slot', fn ($query) => $query->whereBetween('date', [$monthStart, $monthEnd]))
             ->count();
 
-        if ($cancelledCount >= 3 || $noShowCount >= 3) {
-            $reasons = [];
+        if ($cancelledCount < 3 && $noShowCount < 3) {
+            $user->update([
+                'booking_warning_count' => 0,
+                'booking_warning_reason' => null,
+                'booking_warning_at' => null,
+            ]);
 
+            return;
+        }
+
+        $reasons = [];
+
+        if ($cancelledCount >= 3 || $noShowCount >= 3) {
             if ($cancelledCount >= 3) {
                 $reasons[] = '3 cancellations';
             }

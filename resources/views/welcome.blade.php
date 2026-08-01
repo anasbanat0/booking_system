@@ -51,9 +51,9 @@
                 <div class="flex min-w-0 flex-col justify-between xl:min-h-[590px]">
                     <div class="flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
                         <div class="flex min-w-0 flex-col gap-4 sm:flex-row sm:items-center">
-                            <div class="public-home-hero-logo inline-flex w-full max-w-[18rem] items-center justify-center overflow-hidden rounded-[1.15rem] border border-white/75 bg-white px-3 py-2 shadow-2xl shadow-black/25 sm:w-fit sm:max-w-[24rem] md:max-w-[28rem] lg:max-w-[30rem]">
+                            <a href="{{ url('/') }}" aria-label="Go to homepage" class="public-home-hero-logo inline-flex w-full max-w-[18rem] items-center justify-center overflow-hidden rounded-[1.15rem] border border-white/75 bg-white px-3 py-2 shadow-2xl shadow-black/25 transition hover:shadow-black/35 focus:outline-none focus:ring-2 focus:ring-teal-200 sm:w-fit sm:max-w-[24rem] md:max-w-[28rem] lg:max-w-[30rem]">
                                 <img src="{{ $siteLogoUrl }}" alt="Samir Foundation Medical Hub" class="h-9 w-full object-contain sm:h-10 md:h-11 lg:h-12">
-                            </div>
+                            </a>
                             <div class="min-w-0">
                                 <p class="text-2xl font-black tracking-tight sm:text-3xl">{{ $content['brand_title'] }}</p>
                                 <p class="text-base font-semibold text-teal-100">{{ $content['brand_subtitle'] }}</p>
@@ -70,12 +70,6 @@
                             {{ $content['project_intro'] }}
                         </p>
 
-                        @if($selectedLocation)
-                            <p class="mt-4 inline-flex rounded-full border border-teal-200/25 bg-teal-200/10 px-4 py-2 text-sm font-extrabold text-teal-100">
-                                {{ $selectedLocation->name }} Hub
-                            </p>
-                        @endif
-
                         <div class="mt-8 flex max-w-full flex-col items-start gap-3 sm:flex-row">
                             @auth
                                 <a href="{{ route('dashboard') }}" class="inline-flex w-auto max-w-full items-center justify-center rounded-full bg-white px-6 py-3 text-sm font-extrabold text-stone-950 shadow-lg shadow-black/20 hover:bg-teal-50">
@@ -88,20 +82,6 @@
                             @endauth
                         </div>
 
-                        @if($locations->count() > 1)
-                            <div class="mt-8 max-w-full overflow-hidden rounded-xl border border-white/10 bg-white/[0.06] p-4 lg:max-w-2xl">
-                                <p class="text-sm font-extrabold text-white">{{ $content['hub_buttons_heading'] ?? 'Choose your Medical Hub' }}</p>
-                                <p class="mt-1 break-words text-sm leading-6 text-white/62">{{ $content['hub_buttons_description'] ?? 'Open the dedicated page for each hub.' }}</p>
-                                <div class="mt-4 flex flex-wrap gap-2">
-                                    @foreach($locations as $location)
-                                        <a href="{{ route('hubs.show', $location->slug) }}"
-                                           class="max-w-full rounded-full border px-4 py-2 text-sm font-extrabold transition {{ $selectedLocation?->is($location) ? 'border-teal-200 bg-teal-200 text-slate-950' : 'border-white/20 bg-white/10 text-white hover:bg-white hover:text-slate-950' }}">
-                                            {{ $location->name }} Hub
-                                        </a>
-                                    @endforeach
-                                </div>
-                            </div>
-                        @endif
                     </div>
 
                     <div class="grid grid-cols-1 gap-3 pb-4 sm:grid-cols-2 md:grid-cols-4">
@@ -114,7 +94,7 @@
                             <p class="mt-1 text-xs font-semibold text-white/58">{{ $content['stat_bookings_label'] }}</p>
                         </div>
                         <div class="rounded-lg border border-white/10 bg-white/[0.08] p-4">
-                            <p class="text-2xl font-extrabold">{{ number_format($stats['availableSeats']) }}</p>
+                            <p class="text-2xl font-extrabold">{{ number_format($stats['studyHours']) }}</p>
                             <p class="mt-1 text-xs font-semibold text-white/58">{{ $content['stat_seats_label'] }}</p>
                         </div>
                         <div class="rounded-lg border border-white/10 bg-white/[0.08] p-4">
@@ -132,24 +112,35 @@
                             {{ $content['student_card_description'] }}
                         </p>
 
-                        @guest
-                            <a href="{{ route('login') }}" class="mt-5 flex w-full items-center justify-center rounded-md bg-stone-950 px-4 py-3 text-sm font-extrabold text-white hover:bg-stone-800">
-                                {{ $content['student_card_guest_button'] }}
-                            </a>
-                            @if(Route::has('password.request'))
-                                <a href="{{ route('password.request') }}" class="mt-3 flex w-full items-center justify-center rounded-md border border-stone-300 px-4 py-3 text-sm font-bold text-stone-700 hover:bg-stone-100">
-                                    {{ $content['student_card_help_button'] }}
-                                </a>
-                            @endif
+                        @if(!$selectedLocation && $locations->count() > 1)
+                            <div class="mt-5 grid grid-cols-1 gap-2 sm:grid-cols-2">
+                                @foreach($locations as $location)
+                                    <a href="{{ route('hubs.show', $location->slug) }}"
+                                       class="flex items-center justify-center rounded-md border border-teal-700 bg-teal-700 px-4 py-3 text-sm font-extrabold text-white transition hover:bg-teal-800">
+                                        {{ $location->name }} Hub
+                                    </a>
+                                @endforeach
+                            </div>
                         @else
-                            <a href="{{ route('calendar.index') }}" class="mt-5 flex w-full items-center justify-center rounded-md bg-stone-950 px-4 py-3 text-sm font-extrabold text-white hover:bg-stone-800">
-                                {{ $content['student_card_auth_button'] }}
-                            </a>
-                        @endguest
+                            @guest
+                                <a href="{{ route('login') }}" class="mt-5 flex w-full items-center justify-center rounded-md bg-stone-950 px-4 py-3 text-sm font-extrabold text-white hover:bg-stone-800">
+                                    {{ $content['student_card_guest_button'] }}
+                                </a>
+                                @if(Route::has('password.request'))
+                                    <a href="{{ route('password.request') }}" class="mt-3 flex w-full items-center justify-center rounded-md border border-stone-300 px-4 py-3 text-sm font-bold text-stone-700 hover:bg-stone-100">
+                                        {{ $content['student_card_help_button'] }}
+                                    </a>
+                                @endif
+                            @else
+                                <a href="{{ route('calendar.index') }}" class="mt-5 flex w-full items-center justify-center rounded-md bg-stone-950 px-4 py-3 text-sm font-extrabold text-white hover:bg-stone-800">
+                                    {{ $content['student_card_auth_button'] }}
+                                </a>
+                            @endguest
+                        @endif
                     </div>
 
                     <div class="mt-5 rounded-lg border border-stone-200 p-5">
-                        <p class="text-sm font-bold uppercase tracking-wide text-stone-500">{{ $content['team_card_eyebrow'] }}</p>
+                        <p class="text-2xl font-black text-slate-950">{{ $content['team_card_eyebrow'] }}</p>
                         <p class="mt-2 text-sm leading-6 text-stone-600">
                             {{ $content['team_card_description'] }}
                         </p>
@@ -164,7 +155,7 @@
                     </div>
 
                     <div class="mt-5 rounded-lg bg-[#eef2f0] p-4">
-                        <p class="text-sm font-bold text-slate-900">{{ $content['partners_heading'] }}</p>
+                        <p class="text-2xl font-black text-slate-950">{{ $content['partners_heading'] }}</p>
                         @if($supporterCarousel->isNotEmpty())
                             <div class="supporter-carousel supporter-carousel--compact mt-4" style="--supporter-count: {{ max($supporterCarousel->count(), 1) }};" aria-label="Supporters carousel">
                                 <div class="supporter-carousel__track supporter-carousel__track--compact">
@@ -257,9 +248,9 @@
             <div class="mx-auto max-w-7xl px-4 py-12 sm:px-6 lg:px-8">
                 <div class="grid gap-10 lg:grid-cols-[1.25fr_0.9fr_0.9fr]">
                     <div>
-                        <div class="inline-flex rounded-[1.1rem] bg-white px-3 py-2">
+                        <a href="{{ url('/') }}" aria-label="Go to homepage" class="inline-flex rounded-[1.1rem] bg-white px-3 py-2 transition hover:bg-teal-50 focus:outline-none focus:ring-2 focus:ring-teal-200">
                             <img src="{{ $siteLogoUrl }}" alt="Samir Foundation Medical Hub" class="h-12 w-auto object-contain">
-                        </div>
+                        </a>
                         <h2 class="mt-6 max-w-md text-3xl font-black tracking-tight">{{ $content['footer_title'] }}</h2>
                         <p class="mt-4 max-w-xl text-sm leading-7 text-white/68">{{ $content['footer_description'] }}</p>
 

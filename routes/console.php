@@ -6,6 +6,7 @@ use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Schedule;
 use App\Models\Booking;
 use App\Models\BookingRule;
+use App\Services\SlotGenerationService;
 use App\Services\WhatsAppService;
 use Carbon\Carbon;
 
@@ -72,3 +73,22 @@ Artisan::command('bookings:send-reminders', function () {
 })->purpose('Send booking reminders before upcoming appointments');
 
 Schedule::command('bookings:send-reminders')->hourly()->withoutOverlapping();
+
+Artisan::command('slots:generate-upcoming', function () {
+    $result = app(SlotGenerationService::class)->generateUpcomingPeriod(now());
+
+    if (!$result['generated']) {
+        $this->info($result['reason']);
+        return;
+    }
+
+    $this->info(sprintf(
+        'Slots generated for %s to %s. Created: %d. Updated: %d.',
+        $result['start_date'],
+        $result['end_date'],
+        $result['created'],
+        $result['updated'],
+    ));
+})->purpose('Generate booking slots for the next visible booking period 48 hours before it opens');
+
+Schedule::command('slots:generate-upcoming')->hourly()->withoutOverlapping();

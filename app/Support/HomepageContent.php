@@ -7,6 +7,7 @@ use App\Models\BookingLocation;
 use App\Models\SiteContent;
 use App\Models\Slot;
 use App\Models\User;
+use Carbon\Carbon;
 use Illuminate\Support\Facades\Schema;
 
 class HomepageContent
@@ -30,7 +31,7 @@ class HomepageContent
             'primary_cta_auth' => self::value('primary_cta_auth', 'Open dashboard', $location),
             'stat_students_label' => self::value('stat_students_label', 'Students', $location),
             'stat_bookings_label' => self::value('stat_bookings_label', 'Bookings', $location),
-            'stat_seats_label' => self::value('stat_seats_label', 'Seats left', $location),
+            'stat_seats_label' => self::value('stat_seats_label', 'Study hours', $location),
             'stat_branches_label' => self::value('stat_branches_label', 'Branches', $location),
             'student_card_eyebrow' => self::value('student_card_eyebrow', 'Start here', $location),
             'student_card_title' => self::value('student_card_title', 'Student access', $location),
@@ -71,22 +72,24 @@ class HomepageContent
             'social_links' => self::value('social_links', '', $location),
         ];
 
-        $slotQuery = $hasSlots ? Slot::where('is_active', true) : null;
         $bookingQuery = $hasBookings ? Booking::query() : null;
         $studentQuery = $hasUsers ? User::where('role', 'student') : null;
+        $legacyBookings = self::legacyBookings($location, $hasLocations);
 
         if ($location) {
-            $slotQuery?->where('booking_location_id', $location->id);
             $bookingQuery?->whereHas('slot', fn ($query) => $query->where('booking_location_id', $location->id));
             $studentQuery?->where('booking_location_id', $location->id);
         }
+
+        $newBookings = $bookingQuery?->count() ?? 0;
+        $newStudyHours = $hasBookings ? self::newStudyHours($location) : 0;
 
         return [
             'content' => $content,
             'stats' => [
                 'students' => $studentQuery?->count() ?? 0,
-                'bookings' => $bookingQuery?->count() ?? 0,
-                'availableSeats' => $slotQuery?->selectRaw('COALESCE(SUM(capacity - booked_count), 0) as total')->value('total') ?? 0,
+                'bookings' => $legacyBookings + $newBookings,
+                'studyHours' => ($legacyBookings * 3) + $newStudyHours,
                 'branches' => $location ? 1 : ($hasLocations ? BookingLocation::where('is_active', true)->count() : 0),
             ],
             'locations' => $hasLocations ? BookingLocation::where('is_active', true)->orderBy('name')->get() : collect(),
@@ -105,5 +108,59 @@ class HomepageContent
         }
 
         return SiteContent::getValue($key, $fallback);
+    }
+
+    private static function legacyBookings(?BookingLocation $location, bool $hasLocations): int
+    {
+        if ($location) {
+            return self::legacyBookingsForLocation($location);
+        }
+
+        if (!$hasLocations) {
+            return 15900;
+        }
+
+        return BookingLocation::where('is_active', true)
+            ->get()
+            ->sum(fn (BookingLocation $activeLocation) => self::legacyBookingsForLocation($activeLocation));
+    }
+
+    private static function legacyBookingsForLocation(BookingLocation $location): int
+    {
+        $configured = SiteContent::getValue('hub_' . $location->id . '_legacy_bookings', '');
+
+        if (is_numeric($configured)) {
+            return max((int) $configured, 0);
+        }
+
+        $slug = strtolower($location->slug ?? '');
+        $name = mb_strtolower($location->name ?? '');
+
+        if ($slug === 'gaza' || str_contains($name, 'gaza') || str_contains($name, 'غزة')) {
+            return 15000;
+        }
+
+        if (str_contains($slug, 'khan') || str_contains($name, 'khan') || str_contains($name, 'خانيونس')) {
+            return 900;
+        }
+
+        return 0;
+    }
+
+    private static function newStudyHours(?BookingLocation $location): int
+    {
+        return (int) Booking::with('slot')
+            ->when($location, fn ($query) => $query->whereHas('slot', fn ($slotQuery) => $slotQuery->where('booking_location_id', $location->id)))
+            ->get()
+            ->sum(function (Booking $booking) {
+                if (!$booking->slot?->start_time || !$booking->slot?->end_time) {
+                    return 0;
+                }
+
+                $start = Carbon::parse($booking->slot->start_time);
+                $end = Carbon::parse($booking->slot->end_time);
+
+                return max(0, (int) round($start->diffInMinutes($end) / 60));
+            });
     }
 }
