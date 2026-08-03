@@ -94,6 +94,10 @@ class AdminManageUserController extends Controller
             'password' => ['nullable', 'string', 'min:6'],
         ]);
 
+        if ($this->wouldRemoveLastAdmin($user, $validated['role'])) {
+            return back()->with('error', 'You must keep at least one admin account active.');
+        }
+
         $payload = [
             'name' => $validated['name'],
             'email' => $validated['email'],
@@ -264,6 +268,10 @@ class AdminManageUserController extends Controller
             return back()->with('error', 'You cannot delete your own account.');
         }
 
+        if ($this->wouldRemoveLastAdmin($user)) {
+            return back()->with('error', 'You must keep at least one admin account active.');
+        }
+
         $user->delete();
         ActivityLog::record('user_deleted', 'User moved to trash', $user->name . ' was moved to trash.', [
             'user_id' => $user->id,
@@ -283,6 +291,13 @@ class AdminManageUserController extends Controller
             ->whereIn('id', $validated['user_ids'])
             ->whereKeyNot($request->user()->id)
             ->get();
+
+        $selectedAdminCount = $users->where('role', 'admin')->count();
+        $activeAdminCount = User::where('role', 'admin')->count();
+
+        if ($selectedAdminCount > 0 && $activeAdminCount - $selectedAdminCount < 1) {
+            return back()->with('error', 'You must keep at least one admin account active.');
+        }
 
         foreach ($users as $user) {
             $user->delete();
@@ -325,6 +340,19 @@ class AdminManageUserController extends Controller
             $user->role === 'student' && (int) $user->booking_location_id === (int) $request->user()->booking_location_id,
             403
         );
+    }
+
+    private function wouldRemoveLastAdmin(User $user, ?string $newRole = null): bool
+    {
+        if ($user->role !== 'admin') {
+            return false;
+        }
+
+        if ($newRole === 'admin') {
+            return false;
+        }
+
+        return !User::where('role', 'admin')->whereKeyNot($user->id)->exists();
     }
 
     private function resolvedBranchId(Request $request, string $role, ?int $branchId): ?int

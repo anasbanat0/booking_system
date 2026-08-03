@@ -115,7 +115,7 @@
                         @if(!$selectedLocation && $locations->count() > 1)
                             <div class="mt-5 grid grid-cols-1 gap-2 sm:grid-cols-2">
                                 @foreach($locations as $location)
-                                    <a href="{{ route('hubs.show', $location->slug) }}"
+                                    <a href="{{ route('login.hub', $location->slug) }}"
                                        class="flex items-center justify-center rounded-md border border-teal-700 bg-teal-700 px-4 py-3 text-sm font-extrabold text-white transition hover:bg-teal-800">
                                         {{ $location->name }} Hub
                                     </a>

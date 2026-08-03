@@ -287,6 +287,11 @@
         --supporter-gap: 0.5rem;
     }
 
+    .supporter-carousel--login {
+        --supporter-card-width: 10.5rem;
+        --supporter-gap: 0.75rem;
+    }
+
     .supporter-carousel__track {
         animation: supporter-carousel-scroll 24s linear infinite;
         display: flex;
@@ -312,6 +317,11 @@
     .supporter-carousel__item--compact {
         height: 5rem;
         padding: 0.5rem;
+    }
+
+    .supporter-carousel__item--login {
+        height: 6.5rem;
+        padding: 0.75rem;
     }
 
     .supporter-carousel__item--wide {

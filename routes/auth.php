@@ -20,6 +20,9 @@ Route::middleware('guest')->group(function () {
     Route::get('login', [AuthenticatedSessionController::class, 'create'])
         ->name('login');
 
+    Route::get('login/{location:slug}', [AuthenticatedSessionController::class, 'createHub'])
+        ->name('login.hub');
+
     Route::get('admin/login', [AuthenticatedSessionController::class, 'createAdmin'])
         ->name('admin.login');
 

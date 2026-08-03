@@ -1,5 +1,8 @@
 @php
+    use App\Models\SiteContent;
+
     $portal = $portal ?? 'student';
+    $location = $location ?? null;
     $portalConfig = [
         'student' => [
             'label' => 'Student Portal',
@@ -20,9 +23,16 @@
             'accent' => 'text-slate-800',
         ],
     ][$portal] ?? null;
+
+    if ($location && $portal === 'student') {
+        $prefix = 'hub_' . $location->id . '_';
+        $portalConfig['label'] = SiteContent::getValue($prefix . 'login_eyebrow', $location->name . ' Hub');
+        $portalConfig['title'] = SiteContent::getValue($prefix . 'login_form_title', 'Student login');
+        $portalConfig['copy'] = SiteContent::getValue($prefix . 'login_form_description', 'Sign in to book and manage your appointments for ' . $location->name . ' Hub.');
+    }
 @endphp
 
-<x-guest-layout>
+<x-guest-layout :location="$location">
     <div class="mb-6 text-center">
 
         <p class="mt-4 text-sm font-extrabold uppercase tracking-wide {{ $portalConfig['accent'] }}">
@@ -34,6 +44,10 @@
 
     <form method="POST" action="{{ route('login') }}" class="space-y-4">
         @csrf
+        <input type="hidden" name="portal" value="{{ $portal }}">
+        @if($location)
+            <input type="hidden" name="booking_location_id" value="{{ $location->id }}">
+        @endif
 
         <label class="block">
             <x-input-label for="email" :value="__('Email')" />
@@ -61,13 +75,21 @@
         </div>
 
         <button class="w-full rounded-md bg-slate-950 px-4 py-2.5 text-sm font-extrabold text-white hover:bg-slate-800">
-            Continue
+            {{ $location || in_array($portal, ['staff', 'admin'], true) ? 'Login' : 'Continue' }}
         </button>
+
+        @if($location)
+            <a href="{{ url('/') }}" class="flex w-full items-center justify-center rounded-md border border-slate-200 px-4 py-2.5 text-sm font-extrabold text-slate-700 hover:bg-slate-100">
+                Choose another hub
+            </a>
+        @endif
     </form>
 
-    <div class="mt-6 grid grid-cols-3 gap-2 text-center text-xs font-bold">
-        <a href="{{ route('login') }}" class="rounded-md border border-slate-200 px-2 py-2 text-slate-600 hover:bg-slate-100">Student</a>
-        <a href="{{ route('staff.login') }}" class="rounded-md border border-slate-200 px-2 py-2 text-slate-600 hover:bg-slate-100">Staff</a>
-        <a href="{{ route('admin.login') }}" class="rounded-md border border-slate-200 px-2 py-2 text-slate-600 hover:bg-slate-100">Admin</a>
-    </div>
+    @if(!$location && $portal === 'student')
+        <div class="mt-6 grid grid-cols-3 gap-2 text-center text-xs font-bold">
+            <a href="{{ route('login') }}" class="rounded-md border border-slate-200 px-2 py-2 text-slate-600 hover:bg-slate-100">Student</a>
+            <a href="{{ route('staff.login') }}" class="rounded-md border border-slate-200 px-2 py-2 text-slate-600 hover:bg-slate-100">Staff</a>
+            <a href="{{ route('admin.login') }}" class="rounded-md border border-slate-200 px-2 py-2 text-slate-600 hover:bg-slate-100">Admin</a>
+        </div>
+    @endif
 </x-guest-layout>

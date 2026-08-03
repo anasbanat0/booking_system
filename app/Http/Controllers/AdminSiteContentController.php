@@ -11,6 +11,8 @@ class AdminSiteContentController extends Controller
 {
     public function index(Request $request)
     {
+        abort_unless($request->user()->canManageAllBranches(), 403);
+
         $canManageAllBranches = $request->user()->canManageAllBranches();
         $contents = SiteContent::query()
             ->orderBy('key')
@@ -34,6 +36,8 @@ class AdminSiteContentController extends Controller
 
     public function update(Request $request)
     {
+        abort_unless($request->user()->canManageAllBranches(), 403);
+
         $validated = $request->validate([
             'content' => ['required', 'array'],
             'content.*' => ['nullable', 'string'],

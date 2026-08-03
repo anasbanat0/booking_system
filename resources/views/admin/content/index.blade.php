@@ -98,8 +98,6 @@
                         @foreach([
                             'primary_cta_guest' => 'Guest CTA button',
                             'primary_cta_auth' => 'Authenticated CTA button',
-                            'hub_buttons_heading' => 'Hub buttons heading',
-                            'hub_buttons_description' => 'Hub buttons description',
                             'stat_students_label' => 'Students stat label',
                             'stat_bookings_label' => 'Bookings stat label',
                             'stat_seats_label' => 'Study hours stat label',
@@ -249,19 +247,23 @@
 
                 @if($locations->isNotEmpty())
                     <div class="rounded-lg border border-slate-200 bg-slate-50 p-4">
-                        <h2 class="text-base font-extrabold text-slate-950">Hub pages</h2>
-                        <p class="mt-1 text-sm text-slate-500">Each hub can have its own homepage content and supporters. Staff can save only their assigned hub section.</p>
+                        <h2 class="text-base font-extrabold text-slate-950">Hub login pages</h2>
+                        <p class="mt-1 text-sm text-slate-500">Each hub has its own student login page, logo, intro content, and supporters. Staff can save only their assigned hub section.</p>
 
                         @php
                             $hubFields = [
-                                'page_title' => 'Browser page title',
-                                'brand_title' => 'Brand title',
-                                'brand_subtitle' => 'Brand subtitle',
-                                'hero_eyebrow' => 'Hero eyebrow',
-                                'hero_title' => 'Hero title',
-                                'primary_cta_guest' => 'Guest CTA button',
-                                'primary_cta_auth' => 'Authenticated CTA button',
-                                'partners_heading' => 'Partners heading',
+                                'login_eyebrow' => 'Form eyebrow',
+                                'login_form_title' => 'Form title',
+                                'login_form_description' => 'Form description',
+                                'login_hero_eyebrow' => 'Left eyebrow',
+                                'login_hero_title' => 'Left title',
+                                'login_hero_description' => 'Left description',
+                                'login_card_1_label' => 'Card 1 label',
+                                'login_card_1_title' => 'Card 1 title',
+                                'login_card_2_label' => 'Card 2 label',
+                                'login_card_2_title' => 'Card 2 title',
+                                'login_card_3_label' => 'Card 3 label',
+                                'login_card_3_title' => 'Card 3 title',
                                 'legacy_bookings' => 'Legacy bookings',
                             ];
                         @endphp
@@ -284,12 +286,6 @@
                                             </label>
                                         @endforeach
                                     </div>
-
-                                    <label class="mt-4 block">
-                                        <span class="text-sm font-semibold text-slate-700">Project intro</span>
-                                        <textarea name="content[{{ $prefix }}project_intro]" rows="3"
-                                                  class="mt-1 block w-full rounded-md border-slate-300 text-sm shadow-sm focus:border-blue-500 focus:ring-blue-500">{{ old('content.' . $prefix . 'project_intro', $contents[$prefix . 'project_intro']->value ?? '') }}</textarea>
-                                    </label>
 
                                     <div class="mt-4 rounded-lg border border-slate-200 bg-slate-50 p-4">
                                         <h4 class="text-sm font-extrabold text-slate-950">{{ $location->name }} supporters gallery</h4>

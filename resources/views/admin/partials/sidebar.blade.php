@@ -38,7 +38,7 @@
         ],
     ];
 
-    if (Auth::user()?->isAdminPanelUser()) {
+    if (Auth::user()?->canManageAllBranches()) {
         $adminLinks[] = [
             'label' => 'Homepage',
             'route' => 'admin.content.index',

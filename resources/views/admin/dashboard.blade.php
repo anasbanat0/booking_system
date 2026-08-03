@@ -115,7 +115,7 @@
             </div>
 
             <div class="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
-                <p class="text-sm font-medium text-slate-500">Active Slots</p>
+                <p class="text-sm font-medium text-slate-500">Generated Active Periods</p>
                 <p class="mt-3 text-3xl font-bold text-slate-950">{{ number_format($activeSlots) }}</p>
             </div>
         </div>

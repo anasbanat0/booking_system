@@ -23,14 +23,14 @@ Route::get('/', function () {
     return view('welcome', HomepageContent::payload());
 });
 
-Route::redirect('/hubs/khanyounis', '/hubs/khan-younis');
-Route::redirect('/hubs/khan-younes', '/hubs/khan-younis');
-Route::redirect('/hubs/khanieness', '/hubs/khan-younis');
+Route::redirect('/hubs/khanyounis', '/login/khan-younis');
+Route::redirect('/hubs/khan-younes', '/login/khan-younis');
+Route::redirect('/hubs/khanieness', '/login/khan-younis');
 
 Route::get('/hubs/{location:slug}', function (BookingLocation $location) {
     abort_unless($location->is_active, 404);
 
-    return view('welcome', HomepageContent::payload($location));
+    return redirect()->route('login.hub', $location);
 })->name('hubs.show');
 
 Route::get('/dashboard', function () {

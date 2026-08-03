@@ -74,6 +74,10 @@ class ProfileController extends Controller
 
         $user = $request->user();
 
+        if ($user->role === 'admin' && !User::where('role', 'admin')->whereKeyNot($user->id)->exists()) {
+            return Redirect::route('profile.edit')->with('error', 'You cannot delete the only admin account.');
+        }
+
         Auth::logout();
 
         $user->forceDelete();
