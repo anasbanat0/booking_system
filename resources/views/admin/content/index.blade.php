@@ -86,6 +86,52 @@
                     </label>
                 </div>
 
+                @if($canManageAllBranches)
+                    <div class="rounded-lg border border-slate-200 bg-slate-50 p-4">
+                        <h2 class="text-base font-extrabold text-slate-950">Homepage hero background carousel</h2>
+                        <p class="mt-1 text-sm text-slate-500">Upload the image set that rotates behind the homepage hero. No arrows or dots are shown to visitors.</p>
+
+                        @if(!empty($heroBackgroundGallery ?? []))
+                            <div class="mt-4 grid gap-3 sm:grid-cols-3">
+                                @foreach(($heroBackgroundGallery ?? []) as $index => $item)
+                                    <label class="rounded-lg border border-slate-200 bg-white p-3">
+                                        <div class="flex h-32 items-center justify-center overflow-hidden rounded-md bg-slate-50">
+                                            <img src="{{ $item['url'] ?? '' }}" alt="{{ $item['name'] ?? 'Hero background' }}" class="h-full w-full object-cover">
+                                        </div>
+                                        <div class="mt-3 flex items-center gap-2 text-xs font-bold text-rose-700">
+                                            <input type="checkbox" name="remove_hero_background_gallery[]" value="{{ $index }}" class="rounded border-slate-300 text-rose-600">
+                                            Remove
+                                        </div>
+                                    </label>
+                                @endforeach
+                            </div>
+                        @else
+                            <div class="mt-4 grid gap-3 sm:grid-cols-5">
+                                @foreach([
+                                    Vite::asset('resources/images/IMG_0491.webp'),
+                                    Vite::asset('resources/images/IMG_0605.webp'),
+                                    Vite::asset('resources/images/IMG_0612.webp'),
+                                    Vite::asset('resources/images/IMG_0623.webp'),
+                                    Vite::asset('resources/images/IMG_0642.webp'),
+                                ] as $image)
+                                    <div class="h-24 overflow-hidden rounded-lg border border-slate-200 bg-white">
+                                        <img src="{{ $image }}" alt="Default hero background" class="h-full w-full object-cover">
+                                    </div>
+                                @endforeach
+                            </div>
+                            <p class="mt-3 rounded-md border border-blue-100 bg-blue-50 px-3 py-2 text-sm font-bold text-blue-800">
+                                Default project images are active. Upload images below to replace this default set.
+                            </p>
+                        @endif
+
+                        <label class="mt-4 block">
+                            <span class="text-sm font-semibold text-slate-700">Add hero background images</span>
+                            <input type="file" name="hero_background_gallery_files[]" accept="image/*" multiple
+                                   class="mt-1 block w-full rounded-md border border-slate-300 bg-white text-sm shadow-sm file:me-4 file:border-0 file:bg-slate-950 file:px-4 file:py-2 file:text-sm file:font-bold file:text-white focus:border-blue-500 focus:ring-blue-500">
+                        </label>
+                    </div>
+                @endif
+
                 <label class="block">
                     <span class="text-sm font-semibold text-slate-700">Project intro</span>
                     <textarea name="content[project_intro]" rows="4"
@@ -124,8 +170,6 @@
                             'team_card_eyebrow' => 'Team card eyebrow',
                             'team_staff_button' => 'Staff button',
                             'team_admin_button' => 'Admin button',
-                            'partners_heading' => 'Partners heading',
-                            'partners_empty_text' => 'Partners empty text',
                         ] as $key => $label)
                             <label class="block">
                                 <span class="text-sm font-semibold text-slate-700">{{ $label }}</span>
@@ -146,6 +190,57 @@
                                   class="mt-1 block w-full rounded-md border-slate-300 text-sm shadow-sm focus:border-blue-500 focus:ring-blue-500">{{ old('content.team_card_description', $contents['team_card_description']->value ?? '') }}</textarea>
                     </label>
                 </div>
+
+                @if($canManageAllBranches)
+                    <div class="rounded-lg border border-slate-200 bg-slate-50 p-4">
+                        <h2 class="text-base font-extrabold text-slate-950">Inside the Medical Hub gallery</h2>
+                        <p class="mt-1 text-sm text-slate-500">Upload real hub/event photos. Visitors see two photos at a time in an automatic loop, and each photo can open in a larger preview.</p>
+
+                        <div class="mt-4 grid gap-4 lg:grid-cols-2">
+                            <label class="block">
+                                <span class="text-sm font-semibold text-slate-700">Small heading</span>
+                                <input name="content[inside_eyebrow]" value="{{ old('content.inside_eyebrow', $contents['inside_eyebrow']->value ?? 'Inside the Medical Hub') }}"
+                                       class="mt-1 block w-full rounded-md border-slate-300 text-sm shadow-sm focus:border-blue-500 focus:ring-blue-500">
+                            </label>
+                            <label class="block">
+                                <span class="text-sm font-semibold text-slate-700">Main heading</span>
+                                <input name="content[inside_heading]" value="{{ old('content.inside_heading', $contents['inside_heading']->value ?? 'Inside the Medical Hub') }}"
+                                       class="mt-1 block w-full rounded-md border-slate-300 text-sm shadow-sm focus:border-blue-500 focus:ring-blue-500">
+                            </label>
+                            <label class="block lg:col-span-2">
+                                <span class="text-sm font-semibold text-slate-700">Empty gallery text</span>
+                                <input name="content[inside_empty_text]" value="{{ old('content.inside_empty_text', $contents['inside_empty_text']->value ?? 'Medical Hub photos can be added from the admin dashboard.') }}"
+                                       class="mt-1 block w-full rounded-md border-slate-300 text-sm shadow-sm focus:border-blue-500 focus:ring-blue-500">
+                            </label>
+                        </div>
+
+                        @if(!empty($eventGallery ?? []))
+                            <div class="mt-4 grid gap-3 sm:grid-cols-2">
+                                @foreach(($eventGallery ?? []) as $index => $item)
+                                    <label class="rounded-lg border border-slate-200 bg-white p-3">
+                                        <div class="h-40 overflow-hidden rounded-md bg-slate-100">
+                                            <img src="{{ $item['url'] ?? '' }}" alt="{{ $item['name'] ?? 'Medical Hub photo' }}" class="h-full w-full object-cover">
+                                        </div>
+                                        <span class="mt-3 block text-sm font-semibold text-slate-700">Optional photo title</span>
+                                        <input name="event_gallery_titles[{{ $index }}]" value="{{ old('event_gallery_titles.' . $index, $item['name'] ?? '') }}"
+                                               placeholder="Leave empty to hide title"
+                                               class="mt-1 block w-full rounded-md border-slate-300 text-sm shadow-sm focus:border-blue-500 focus:ring-blue-500">
+                                        <div class="mt-3 flex items-center gap-2 text-xs font-bold text-rose-700">
+                                            <input type="checkbox" name="remove_event_gallery[]" value="{{ $index }}" class="rounded border-slate-300 text-rose-600">
+                                            Remove
+                                        </div>
+                                    </label>
+                                @endforeach
+                            </div>
+                        @endif
+
+                        <label class="mt-4 block">
+                            <span class="text-sm font-semibold text-slate-700">Add Medical Hub photos</span>
+                            <input type="file" name="event_gallery_files[]" accept="image/*" multiple
+                                   class="mt-1 block w-full rounded-md border border-slate-300 bg-white text-sm shadow-sm file:me-4 file:border-0 file:bg-slate-950 file:px-4 file:py-2 file:text-sm file:font-bold file:text-white focus:border-blue-500 focus:ring-blue-500">
+                        </label>
+                    </div>
+                @endif
 
                 <div class="rounded-lg border border-slate-200 bg-slate-50 p-4">
                     <h2 class="text-base font-extrabold text-slate-950">Homepage steps</h2>
@@ -208,13 +303,6 @@
                         <textarea id="instructions-ar-html" data-html-editor="instructions-ar" dir="rtl" class="hidden min-h-96 w-full rounded-b-md border border-slate-300 bg-slate-950 p-3 text-right font-mono text-sm leading-6 text-slate-50 focus:outline-none focus:ring-2 focus:ring-blue-500"></textarea>
                     </label>
                 </div>
-
-                <label class="block">
-                    <span class="text-sm font-semibold text-slate-700">Supporters</span>
-                    <input name="content[supporters]" value="{{ old('content.supporters', $contents['supporters']->value ?? '') }}"
-                           class="mt-1 block w-full rounded-md border-slate-300 text-sm shadow-sm focus:border-blue-500 focus:ring-blue-500">
-                    <span class="mt-1 block text-xs text-slate-500">Separate names with commas.</span>
-                </label>
 
                 @if($canManageAllBranches)
                     <div class="rounded-lg border border-slate-200 bg-slate-50 p-4">
@@ -318,7 +406,7 @@
 
                 <div class="rounded-lg border border-slate-200 bg-slate-50 p-4">
                     <h2 class="text-base font-extrabold text-slate-950">Footer content</h2>
-                    <p class="mt-1 text-sm text-slate-500">These fields control the public footer, supporting partner note, and optional call-to-action.</p>
+                    <p class="mt-1 text-sm text-slate-500">These fields control the public footer, contact information, legal note, and optional call-to-action.</p>
 
                     <div class="mt-4 grid gap-4 lg:grid-cols-2">
                         <label class="block">
@@ -339,12 +427,12 @@
                         </label>
                         <label class="block">
                             <span class="text-sm font-semibold text-slate-700">Contact heading</span>
-                            <input name="content[footer_contact_heading]" value="{{ old('content.footer_contact_heading', $contents['footer_contact_heading']->value ?? 'Contact') }}"
+                            <input name="content[footer_contact_heading]" value="{{ old('content.footer_contact_heading', $contents['footer_contact_heading']->value ?? 'Information') }}"
                                    class="mt-1 block w-full rounded-md border-slate-300 text-sm shadow-sm focus:border-blue-500 focus:ring-blue-500">
                         </label>
                         <label class="block">
-                            <span class="text-sm font-semibold text-slate-700">Support heading</span>
-                            <input name="content[footer_support_heading]" value="{{ old('content.footer_support_heading', $contents['footer_support_heading']->value ?? 'Support and links') }}"
+                            <span class="text-sm font-semibold text-slate-700">Legal note heading</span>
+                            <input name="content[footer_legal_heading]" value="{{ old('content.footer_legal_heading', $contents['footer_legal_heading']->value ?? 'Foundation details') }}"
                                    class="mt-1 block w-full rounded-md border-slate-300 text-sm shadow-sm focus:border-blue-500 focus:ring-blue-500">
                         </label>
                     </div>
@@ -356,9 +444,9 @@
                     </label>
 
                     <label class="mt-4 block">
-                        <span class="text-sm font-semibold text-slate-700">Supporters note</span>
-                        <textarea name="content[supporters_note]" rows="3"
-                                  class="mt-1 block w-full rounded-md border-slate-300 text-sm shadow-sm focus:border-blue-500 focus:ring-blue-500">{{ old('content.supporters_note', $contents['supporters_note']->value ?? 'Supporting education access through prepared study spaces in Gaza and Khan Younis.') }}</textarea>
+                        <span class="text-sm font-semibold text-slate-700">Footer legal text</span>
+                        <textarea name="content[footer_legal_text]" rows="4"
+                                  class="mt-1 block w-full rounded-md border-slate-300 text-sm shadow-sm focus:border-blue-500 focus:ring-blue-500">{{ old('content.footer_legal_text', $contents['footer_legal_text']->value ?? "From Under the Rubble to a Brighter Palestinian Healthcare System.\nRegistered in England & Wales\nCompany No. 16334765") }}</textarea>
                     </label>
 
                     <label class="mt-4 block">
@@ -379,14 +467,14 @@
                 <label class="block">
                     <span class="text-sm font-semibold text-slate-700">Contact info</span>
                     <textarea name="content[contact_info]" rows="4"
-                              class="mt-1 block w-full rounded-md border-slate-300 text-sm shadow-sm focus:border-blue-500 focus:ring-blue-500">{{ old('content.contact_info', $contents['contact_info']->value ?? '') }}</textarea>
+                              class="mt-1 block w-full rounded-md border-slate-300 text-sm shadow-sm focus:border-blue-500 focus:ring-blue-500">{{ old('content.contact_info', $contents['contact_info']->value ?? "Medical Hub - South Gaza\nLocation: Khan Younis City, Midway along Al-Bahr Street, East of Jasser Building.\nContact: +972597231717\n\nMedical Hub - Gaza City\nLocation: Gaza City, next to the Islamic University, Ligo Building\nContact: +972567371312") }}</textarea>
                 </label>
 
                 <label class="block">
                     <span class="text-sm font-semibold text-slate-700">Social links</span>
                     <textarea name="content[social_links]" rows="4"
-                              class="mt-1 block w-full rounded-md border-slate-300 text-sm shadow-sm focus:border-blue-500 focus:ring-blue-500">{{ old('content.social_links', $contents['social_links']->value ?? '') }}</textarea>
-                    <span class="mt-1 block text-xs text-slate-500">Use one link per line, for example: Facebook: https://facebook.com</span>
+                              class="mt-1 block w-full rounded-md border-slate-300 text-sm shadow-sm focus:border-blue-500 focus:ring-blue-500">{{ old('content.social_links', $contents['social_links']->value ?? "Facebook: #\nInstagram: #\nLinkedIn: #\nYouTube: #") }}</textarea>
+                    <span class="mt-1 block text-xs text-slate-500">Use one link per line. Supported icons: Facebook, Instagram, LinkedIn, YouTube. WhatsApp is not shown on the homepage footer.</span>
                 </label>
 
                 <button class="rounded-md bg-slate-950 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800">

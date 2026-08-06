@@ -24,13 +24,19 @@ class AdminSiteContentController extends Controller
         $siteLogoUrl = $contents['site_logo_url']->value ?? '';
         $supporterGallery = json_decode($contents['supporter_gallery']->value ?? '[]', true);
         $supporterGallery = is_array($supporterGallery) ? array_values($supporterGallery) : [];
+        $heroBackgroundGallery = json_decode($contents['hero_background_gallery']->value ?? '[]', true);
+        $heroBackgroundGallery = is_array($heroBackgroundGallery) ? array_values($heroBackgroundGallery) : [];
+        $eventGallery = json_decode($contents['event_gallery']->value ?? '[]', true);
+        $eventGallery = is_array($eventGallery) ? array_values($eventGallery) : [];
 
         return view('admin.content.index', compact(
             'canManageAllBranches',
             'contents',
             'locations',
             'siteLogoUrl',
-            'supporterGallery'
+            'supporterGallery',
+            'heroBackgroundGallery',
+            'eventGallery'
         ));
     }
 
@@ -45,10 +51,18 @@ class AdminSiteContentController extends Controller
             'remove_site_logo' => ['nullable', 'boolean'],
             'supporter_gallery_files' => ['nullable', 'array'],
             'supporter_gallery_files.*' => ['image', 'max:4096'],
+            'hero_background_gallery_files' => ['nullable', 'array'],
+            'hero_background_gallery_files.*' => ['image', 'max:8192'],
+            'event_gallery_files' => ['nullable', 'array'],
+            'event_gallery_files.*' => ['image', 'max:8192'],
+            'event_gallery_titles' => ['nullable', 'array'],
+            'event_gallery_titles.*' => ['nullable', 'string', 'max:120'],
             'hub_supporter_gallery_files' => ['nullable', 'array'],
             'hub_supporter_gallery_files.*' => ['nullable', 'array'],
             'hub_supporter_gallery_files.*.*' => ['image', 'max:4096'],
             'remove_supporter_gallery' => ['nullable', 'array'],
+            'remove_hero_background_gallery' => ['nullable', 'array'],
+            'remove_event_gallery' => ['nullable', 'array'],
             'remove_hub_supporter_gallery' => ['nullable', 'array'],
         ]);
 
@@ -72,6 +86,26 @@ class AdminSiteContentController extends Controller
                 'supporter_gallery',
                 $request->file('supporter_gallery_files', []),
                 $request->input('remove_supporter_gallery', [])
+            );
+        }
+
+        if ($this->canUpdateKey($request, 'hero_background_gallery')) {
+            $this->syncGallery(
+                'hero_background_gallery',
+                $request->file('hero_background_gallery_files', []),
+                $request->input('remove_hero_background_gallery', []),
+                [],
+                'hero'
+            );
+        }
+
+        if ($this->canUpdateKey($request, 'event_gallery')) {
+            $this->syncGallery(
+                'event_gallery',
+                $request->file('event_gallery_files', []),
+                $request->input('remove_event_gallery', []),
+                $request->input('event_gallery_titles', []),
+                'inside-hub'
             );
         }
 
@@ -141,9 +175,15 @@ class AdminSiteContentController extends Controller
         return str_starts_with($key, 'hub_' . $request->user()->booking_location_id . '_');
     }
 
-    private function syncGallery(string $key, array $files, array $removeIndexes): void
+    private function syncGallery(string $key, array $files, array $removeIndexes, array $titleUpdates = [], string $directory = 'supporters'): void
     {
         $gallery = $this->galleryItems($key);
+        foreach ($titleUpdates as $index => $title) {
+            if (isset($gallery[(int) $index])) {
+                $gallery[(int) $index]['name'] = trim((string) $title);
+            }
+        }
+
         $removeIndexes = collect($removeIndexes)->map(fn ($index) => (int) $index)->all();
 
         if ($removeIndexes !== []) {
@@ -163,7 +203,7 @@ class AdminSiteContentController extends Controller
                 continue;
             }
 
-            $path = $file->store('supporters', 'public');
+            $path = $file->store($directory, 'public');
 
             $gallery[] = [
                 'name' => pathinfo($file->getClientOriginalName(), PATHINFO_FILENAME),
