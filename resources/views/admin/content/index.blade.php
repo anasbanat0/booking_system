@@ -142,8 +142,6 @@
                     <h2 class="text-base font-extrabold text-slate-950">Buttons and stats labels</h2>
                     <div class="mt-4 grid gap-4 lg:grid-cols-3">
                         @foreach([
-                            'primary_cta_guest' => 'Guest CTA button',
-                            'primary_cta_auth' => 'Authenticated CTA button',
                             'stat_students_label' => 'Students stat label',
                             'stat_bookings_label' => 'Bookings stat label',
                             'stat_seats_label' => 'Study hours stat label',
@@ -221,10 +219,6 @@
                                         <div class="h-40 overflow-hidden rounded-md bg-slate-100">
                                             <img src="{{ $item['url'] ?? '' }}" alt="{{ $item['name'] ?? 'Medical Hub photo' }}" class="h-full w-full object-cover">
                                         </div>
-                                        <span class="mt-3 block text-sm font-semibold text-slate-700">Optional photo title</span>
-                                        <input name="event_gallery_titles[{{ $index }}]" value="{{ old('event_gallery_titles.' . $index, $item['name'] ?? '') }}"
-                                               placeholder="Leave empty to hide title"
-                                               class="mt-1 block w-full rounded-md border-slate-300 text-sm shadow-sm focus:border-blue-500 focus:ring-blue-500">
                                         <div class="mt-3 flex items-center gap-2 text-xs font-bold text-rose-700">
                                             <input type="checkbox" name="remove_event_gallery[]" value="{{ $index }}" class="rounded border-slate-300 text-rose-600">
                                             Remove

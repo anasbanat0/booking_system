@@ -188,13 +188,15 @@
                         </select>
                     </label>
                     <label class="block">
-                        <span class="text-sm font-medium text-slate-700">Available slot</span>
+                        <span class="text-sm font-medium text-slate-700">Slot</span>
                         <select name="slot_id"
                                 class="mt-1 block w-full rounded-md border-slate-300 text-sm shadow-sm focus:border-blue-500 focus:ring-blue-500">
                             <option value="">Choose slot</option>
                             @foreach($slots as $slot)
+                                @php($seatsLeft = $slot->capacity - $slot->booked_count)
                                 <option value="{{ $slot->id }}">
-                                    {{ $slot->location?->name }} - {{ $slot->date }} - {{ $slot->start_time }} to {{ $slot->end_time }} ({{ $slot->capacity - $slot->booked_count }} seats)
+                                    {{ $slot->location?->name }} - {{ $slot->date }} - {{ $slot->start_time }} to {{ $slot->end_time }}
+                                    ({{ $seatsLeft > 0 ? $seatsLeft . ' seats' : 'Full - admin override allowed' }})
                                 </option>
                             @endforeach
                         </select>

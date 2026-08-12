@@ -141,9 +141,9 @@ class AdminBookingController extends Controller
                 abort(403);
             }
 
-            if ($slot->booked_count >= $slot->capacity || ! $slot->is_active) {
+            if (! $slot->is_active) {
                 throw ValidationException::withMessages([
-                    'slot_id' => 'This slot is not available.',
+                    'slot_id' => 'This slot is not active.',
                 ]);
             }
 

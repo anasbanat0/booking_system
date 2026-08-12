@@ -28,8 +28,6 @@ class HomepageContent
             'hero_title' => self::value('hero_title', 'Reserve a calm, connected seat for exams and study.', $location),
             'hero_background_gallery' => SiteContent::getValue('hero_background_gallery', '[]'),
             'project_intro' => self::value('project_intro', 'A quiet, reliable Medical Hub by Samir Foundation, prepared for students who need stable electricity, internet, and a focused place to study or take online exams.', $location),
-            'primary_cta_guest' => self::value('primary_cta_guest', 'Login to book', $location),
-            'primary_cta_auth' => self::value('primary_cta_auth', 'Open dashboard', $location),
             'stat_students_label' => self::value('stat_students_label', 'Students', $location),
             'stat_bookings_label' => self::value('stat_bookings_label', 'Bookings', $location),
             'stat_seats_label' => self::value('stat_seats_label', 'Study hours', $location),

@@ -140,18 +140,6 @@
                             {{ $content['project_intro'] }}
                         </p>
 
-                        <div class="mt-8 flex max-w-full flex-col items-start gap-3 sm:flex-row">
-                            @auth
-                                <a href="{{ route('dashboard') }}" class="inline-flex w-auto max-w-full items-center justify-center rounded-full bg-white px-6 py-3 text-sm font-extrabold text-stone-950 shadow-lg shadow-black/20 hover:bg-[#edf6fd]">
-                                    {{ $content['primary_cta_auth'] }}
-                                </a>
-                            @else
-                                <a href="{{ route('login') }}" class="inline-flex w-auto max-w-full items-center justify-center rounded-full bg-white px-6 py-3 text-sm font-extrabold text-stone-950 shadow-lg shadow-black/20 hover:bg-[#edf6fd]">
-                                    {{ $content['primary_cta_guest'] }}
-                                </a>
-                            @endauth
-                        </div>
-
                     </div>
 
                     <div class="grid grid-cols-1 gap-3 pb-4 sm:grid-cols-2 md:grid-cols-4">
@@ -244,12 +232,8 @@
                                 <button type="button"
                                         class="inside-hub-carousel__item"
                                         data-gallery-image="{{ $photo['image'] }}"
-                                        data-gallery-title="{{ $photo['name'] }}"
-                                        aria-label="Open {{ $photo['name'] ?: 'Medical Hub photo' }}">
+                                        aria-label="Open Medical Hub photo">
                                     <img src="{{ $photo['image'] }}" alt="{{ $photo['name'] ?: 'Medical Hub photo' }}" class="inside-hub-carousel__image">
-                                    @if($photo['name'])
-                                        <span class="inside-hub-carousel__caption">{{ $photo['name'] }}</span>
-                                    @endif
                                 </button>
                             @endforeach
                         </div>
@@ -267,7 +251,6 @@
             <div class="inside-hub-lightbox__panel" role="dialog" aria-modal="true" aria-label="Medical Hub photo preview">
                 <button type="button" class="inside-hub-lightbox__close" data-gallery-close aria-label="Close gallery preview">Close</button>
                 <img src="" alt="" class="inside-hub-lightbox__image" data-gallery-preview-image>
-                <p class="inside-hub-lightbox__title" data-gallery-preview-title></p>
             </div>
         </div>
 
@@ -402,18 +385,15 @@
 
         const insideHubLightbox = document.getElementById('inside-hub-lightbox');
         const insideHubPreviewImage = document.querySelector('[data-gallery-preview-image]');
-        const insideHubPreviewTitle = document.querySelector('[data-gallery-preview-title]');
 
         document.querySelectorAll('[data-gallery-image]').forEach(button => {
             button.addEventListener('click', () => {
-                if (!insideHubLightbox || !insideHubPreviewImage || !insideHubPreviewTitle) {
+                if (!insideHubLightbox || !insideHubPreviewImage) {
                     return;
                 }
 
-                const title = button.dataset.galleryTitle || '';
                 insideHubPreviewImage.src = button.dataset.galleryImage || '';
-                insideHubPreviewImage.alt = title || 'Medical Hub photo';
-                insideHubPreviewTitle.textContent = title;
+                insideHubPreviewImage.alt = 'Medical Hub photo';
                 insideHubLightbox.classList.remove('hidden');
                 insideHubLightbox.setAttribute('aria-hidden', 'false');
             });

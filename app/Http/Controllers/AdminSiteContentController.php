@@ -55,8 +55,6 @@ class AdminSiteContentController extends Controller
             'hero_background_gallery_files.*' => ['image', 'max:8192'],
             'event_gallery_files' => ['nullable', 'array'],
             'event_gallery_files.*' => ['image', 'max:8192'],
-            'event_gallery_titles' => ['nullable', 'array'],
-            'event_gallery_titles.*' => ['nullable', 'string', 'max:120'],
             'hub_supporter_gallery_files' => ['nullable', 'array'],
             'hub_supporter_gallery_files.*' => ['nullable', 'array'],
             'hub_supporter_gallery_files.*.*' => ['image', 'max:4096'],
@@ -104,7 +102,7 @@ class AdminSiteContentController extends Controller
                 'event_gallery',
                 $request->file('event_gallery_files', []),
                 $request->input('remove_event_gallery', []),
-                $request->input('event_gallery_titles', []),
+                [],
                 'inside-hub'
             );
         }

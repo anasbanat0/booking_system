@@ -79,7 +79,7 @@
 @if($toasts->isNotEmpty())
     <div
         aria-live="polite"
-        class="fixed left-1/2 top-5 z-[100] flex w-[calc(100%-2rem)] max-w-xl -translate-x-1/2 flex-col gap-3 sm:top-7"
+        class="fixed left-1/2 top-1/2 z-[100] flex w-[calc(100%-2rem)] max-w-xl -translate-x-1/2 -translate-y-1/2 flex-col gap-3"
     >
         @foreach($toasts as $toast)
             @php($toastStyles = $styles[$toast['type']] ?? $styles['info'])
@@ -89,11 +89,11 @@
                 x-init="setTimeout(() => show = false, 5200)"
                 x-show="show"
                 x-transition:enter="transform transition ease-out duration-300"
-                x-transition:enter-start="-translate-y-4 scale-95 opacity-0"
+                x-transition:enter-start="scale-95 opacity-0"
                 x-transition:enter-end="translate-y-0 scale-100 opacity-100"
                 x-transition:leave="transform transition ease-in duration-200"
                 x-transition:leave-start="translate-y-0 scale-100 opacity-100"
-                x-transition:leave-end="-translate-y-3 scale-95 opacity-0"
+                x-transition:leave-end="scale-95 opacity-0"
                 class="relative overflow-hidden rounded-2xl border {{ $toastStyles['shell'] }} shadow-2xl backdrop-blur"
                 role="alert"
             >
