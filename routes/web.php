@@ -148,6 +148,9 @@ Route::middleware(['auth', 'admin'])->group(function () {
     Route::patch('/admin/users-calendar/bookings/{booking}', [AdminUserCalendarController::class, 'updateBooking'])
         ->name('admin.users-calendar.bookings.update');
 
+    Route::post('/admin/users-calendar/slots/{slot}/bookings', [AdminUserCalendarController::class, 'storeManualBooking'])
+        ->name('admin.users-calendar.slots.bookings.store');
+
     Route::get('/admin/manage/users', [AdminManageUserController::class, 'index'])->name('admin.manage.users.index');
     Route::post('/admin/manage/users', [AdminManageUserController::class, 'store'])->name('admin.manage.users.store');
     Route::patch('/admin/manage/users/{user}', [AdminManageUserController::class, 'update'])->name('admin.manage.users.update');

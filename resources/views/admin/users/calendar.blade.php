@@ -258,12 +258,24 @@
 
                                 <div class="border-s border-slate-200 p-3">
                                     @forelse($cellSlots as $slot)
-                                        <div class="mb-3 last:mb-0">
+                                        <div x-data="{ manualOpen: false }"
+                                             @click="manualOpen = true"
+                                             class="mb-3 cursor-pointer rounded-lg border border-transparent p-2 transition hover:border-blue-200 hover:bg-blue-50/60 last:mb-0">
                                             <div class="mb-2 flex items-center justify-between gap-2">
-                                                <p class="truncate text-xs font-extrabold text-slate-600">{{ $slot->location?->name }}</p>
-                                                <p class="shrink-0 text-[11px] font-bold text-slate-400">
-                                                    {{ substr($slot->start_time, 0, 5) }}-{{ substr($slot->end_time, 0, 5) }}
-                                                </p>
+                                                <div class="min-w-0">
+                                                    <p class="truncate text-xs font-extrabold text-slate-600">{{ $slot->location?->name }}</p>
+                                                    <p class="mt-0.5 text-[11px] font-bold text-slate-400">{{ $slot->capacity - $slot->booked_count }} seats left</p>
+                                                </div>
+                                                <div class="shrink-0 text-right">
+                                                    <p class="text-[11px] font-bold text-slate-400">
+                                                        {{ substr($slot->start_time, 0, 5) }}-{{ substr($slot->end_time, 0, 5) }}
+                                                    </p>
+                                                    <button type="button"
+                                                            @click.stop="manualOpen = ! manualOpen"
+                                                            class="mt-1 rounded-md bg-blue-600 px-2 py-1 text-[11px] font-extrabold text-white shadow-sm hover:bg-blue-700">
+                                                        Add booking
+                                                    </button>
+                                                </div>
                                             </div>
 
                                             <div class="flex flex-wrap content-start gap-1.5">
@@ -349,6 +361,40 @@
                                                     </span>
                                                 @endforelse
                                             </div>
+
+                                            <form x-show="manualOpen"
+                                                  x-cloak
+                                                  @click.stop
+                                                  method="POST"
+                                                  action="{{ route('admin.users-calendar.slots.bookings.store', $slot) }}"
+                                                  class="mt-3 rounded-lg border border-blue-200 bg-white p-3 shadow-sm">
+                                                @csrf
+                                                <input type="hidden" name="user_id" data-calendar-student-id>
+
+                                                <div class="relative">
+                                                    <label class="block text-[11px] font-extrabold uppercase tracking-wide text-slate-500">
+                                                        Student
+                                                    </label>
+                                                    <input type="text"
+                                                           autocomplete="off"
+                                                           data-calendar-student-search-input
+                                                           placeholder="Search name, phone, email"
+                                                           class="mt-1 block w-full rounded-md border-slate-300 text-xs shadow-sm focus:border-blue-500 focus:ring-blue-500">
+                                                    <div data-calendar-student-search-results class="absolute z-30 mt-1 hidden max-h-56 w-full overflow-y-auto rounded-lg border border-slate-200 bg-white shadow-xl"></div>
+                                                    <p data-calendar-student-search-selected class="mt-1 hidden truncate text-[11px] font-bold text-blue-700"></p>
+                                                </div>
+
+                                                <div class="mt-3 flex items-center gap-2">
+                                                    <button class="flex-1 rounded-md bg-slate-950 px-3 py-2 text-xs font-extrabold text-white hover:bg-slate-800">
+                                                        Confirm booking
+                                                    </button>
+                                                    <button type="button"
+                                                            @click="manualOpen = false"
+                                                            class="rounded-md border border-slate-300 px-3 py-2 text-xs font-bold text-slate-600 hover:bg-slate-100">
+                                                        Close
+                                                    </button>
+                                                </div>
+                                            </form>
                                         </div>
                                     @empty
                                         <div class="flex h-full min-h-28 items-center justify-center rounded-md border border-dashed border-slate-200 text-xs font-semibold text-slate-400">
@@ -365,4 +411,127 @@
         </div>
     </main>
 </div>
+
+@php
+    $calendarManualBookingStudents = $users->map(function ($user) {
+        return [
+            'id' => $user->id,
+            'name' => $user->name,
+            'email' => $user->email,
+            'phone' => $user->phone,
+        ];
+    })->values();
+@endphp
+
+<script>
+const calendarManualBookingStudents = @json($calendarManualBookingStudents);
+
+document.addEventListener('DOMContentLoaded', function () {
+    function closeCalendarStudentResults(scope) {
+        scope.querySelector('[data-calendar-student-search-results]')?.classList.add('hidden');
+    }
+
+    function renderCalendarStudentResults(scope, query = '') {
+        const input = scope.querySelector('[data-calendar-student-search-input]');
+        const idInput = scope.querySelector('[data-calendar-student-id]');
+        const results = scope.querySelector('[data-calendar-student-search-results]');
+
+        if (!input || !idInput || !results) {
+            return;
+        }
+
+        const normalizedQuery = query.trim().toLowerCase();
+        const matches = calendarManualBookingStudents
+            .filter(student => {
+                const haystack = `${student.name || ''} ${student.email || ''} ${student.phone || ''}`.toLowerCase();
+                return normalizedQuery === '' || haystack.includes(normalizedQuery);
+            })
+            .slice(0, 12);
+
+        results.innerHTML = '';
+
+        if (matches.length === 0) {
+            results.innerHTML = '<div class="px-3 py-3 text-xs font-semibold text-slate-500">No students found.</div>';
+            results.classList.remove('hidden');
+            return;
+        }
+
+        matches.forEach(student => {
+            const button = document.createElement('button');
+            button.type = 'button';
+            button.className = 'block w-full border-b border-slate-100 px-3 py-2 text-left last:border-b-0 hover:bg-blue-50';
+            button.innerHTML = `
+                <span class="block text-xs font-extrabold text-slate-950">${student.name || 'Unnamed student'}</span>
+                <span class="mt-0.5 block text-[11px] font-semibold text-slate-500">${student.phone || 'No phone'} · ${student.email || 'No email'}</span>
+            `;
+            button.addEventListener('click', function () {
+                const selected = scope.querySelector('[data-calendar-student-search-selected]');
+                idInput.value = student.id;
+                input.value = `${student.name || 'Student'}${student.phone ? ' - ' + student.phone : ''}`;
+
+                if (selected) {
+                    selected.textContent = `Selected: ${student.name || 'Student'}${student.phone ? ' · ' + student.phone : ''}`;
+                    selected.className = 'mt-1 truncate text-[11px] font-bold text-blue-700';
+                    selected.classList.remove('hidden');
+                }
+
+                closeCalendarStudentResults(scope);
+            });
+            results.appendChild(button);
+        });
+
+        results.classList.remove('hidden');
+    }
+
+    document.querySelectorAll('[data-calendar-student-search-input]').forEach(input => {
+        const form = input.closest('form');
+        const idInput = form?.querySelector('[data-calendar-student-id]');
+        const selected = form?.querySelector('[data-calendar-student-search-selected]');
+
+        input.addEventListener('input', function () {
+            if (idInput) {
+                idInput.value = '';
+            }
+
+            selected?.classList.add('hidden');
+            renderCalendarStudentResults(form, this.value);
+        });
+
+        input.addEventListener('focus', function () {
+            renderCalendarStudentResults(form, this.value);
+        });
+    });
+
+    document.addEventListener('click', event => {
+        document.querySelectorAll('[data-calendar-student-search-results]').forEach(results => {
+            const form = results.closest('form');
+            const input = form?.querySelector('[data-calendar-student-search-input]');
+
+            if (form && input && !results.contains(event.target) && event.target !== input) {
+                closeCalendarStudentResults(form);
+            }
+        });
+    });
+
+    document.querySelectorAll('form[action*="/admin/users-calendar/slots/"]').forEach(form => {
+        form.addEventListener('submit', event => {
+            const idInput = form.querySelector('[data-calendar-student-id]');
+            const input = form.querySelector('[data-calendar-student-search-input]');
+            const selected = form.querySelector('[data-calendar-student-search-selected]');
+
+            if (!idInput?.value) {
+                event.preventDefault();
+                input?.focus();
+                renderCalendarStudentResults(form, input?.value || '');
+
+                if (selected) {
+                    selected.textContent = 'Please choose a student from the search results.';
+                    selected.className = 'mt-1 truncate text-[11px] font-bold text-rose-700';
+                    selected.classList.remove('hidden');
+                }
+            }
+        });
+    });
+});
+</script>
 @endsection

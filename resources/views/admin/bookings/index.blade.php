@@ -19,7 +19,26 @@
     ];
     $statsRangeQuery = request()->only(['stats_period', 'stats_start_date', 'stats_end_date', 'location_id']);
     $hasStatsRangeFilters = request()->hasAny(['stats_period', 'stats_start_date', 'stats_end_date']);
+    $authUser = Auth::user();
 @endphp
+
+<style>
+    .manual-booking-inline-grid {
+        display: grid;
+        gap: 0.75rem;
+    }
+
+    @media (min-width: 900px) {
+        .manual-booking-inline-grid {
+            grid-template-columns: minmax(0, 1.15fr) 180px minmax(260px, 1fr) 150px;
+            align-items: start;
+        }
+
+        .manual-booking-inline-grid > button {
+            margin-top: 1.55rem;
+        }
+    }
+</style>
 
 <div class="min-h-screen bg-slate-50 lg:flex">
     @include('admin.partials.sidebar')
@@ -133,7 +152,7 @@
                             </select>
                         </label>
 
-                        @if(Auth::user()?->canManageAllBranches())
+                        @if($authUser && $authUser->canManageAllBranches())
                             <label class="block">
                                 <span class="text-sm font-medium text-slate-700">Branch</span>
                                 <select name="location_id"
@@ -150,7 +169,7 @@
                             <div class="block">
                                 <span class="text-sm font-medium text-slate-700">Branch</span>
                                 <div class="mt-1 flex h-10 items-center rounded-md border border-slate-200 bg-slate-50 px-3 text-sm font-semibold text-slate-600">
-                                    {{ Auth::user()?->managedLocation?->name ?? 'Assigned branch' }}
+                                    {{ optional($authUser->managedLocation)->name ?? 'Assigned branch' }}
                                 </div>
                             </div>
                         @endif
@@ -175,32 +194,36 @@
             </div>
 
             <div class="border-b border-slate-200 bg-slate-50 px-5 py-4">
-                <form method="POST" action="{{ route('admin.bookings.manual') }}" class="grid gap-3 lg:grid-cols-[minmax(0,260px)_minmax(0,1fr)_auto] lg:items-end">
+                <form method="POST" action="{{ route('admin.bookings.manual') }}" data-manual-booking-form class="manual-booking-inline-grid">
                     @csrf
-                    <label class="block">
+                    <label class="relative block">
                         <span class="text-sm font-medium text-slate-700">Create booking for student</span>
-                        <select name="user_id"
-                                class="mt-1 block w-full rounded-md border-slate-300 text-sm shadow-sm focus:border-blue-500 focus:ring-blue-500">
-                            <option value="">Choose student</option>
-                            @foreach($users as $user)
-                                <option value="{{ $user->id }}">{{ $user->name }} - {{ $user->email }}</option>
-                            @endforeach
-                        </select>
+                        <input type="hidden" name="user_id" data-student-search-id>
+                        <input type="search"
+                               autocomplete="off"
+                               placeholder="Search name, phone, email"
+                               data-student-search-input
+                               class="mt-1 block w-full rounded-md border-slate-300 text-sm shadow-sm focus:border-blue-500 focus:ring-blue-500">
+                        <div data-student-search-results class="absolute z-30 mt-1 hidden max-h-72 w-full overflow-y-auto rounded-lg border border-slate-200 bg-white shadow-xl"></div>
+                        <p data-student-search-selected class="mt-1 hidden truncate text-xs font-bold text-blue-700"></p>
                     </label>
                     <label class="block">
-                        <span class="text-sm font-medium text-slate-700">Slot</span>
-                        <select name="slot_id"
-                                class="mt-1 block w-full rounded-md border-slate-300 text-sm shadow-sm focus:border-blue-500 focus:ring-blue-500">
-                            <option value="">Choose slot</option>
-                            @foreach($slots as $slot)
-                                @php($seatsLeft = $slot->capacity - $slot->booked_count)
-                                <option value="{{ $slot->id }}">
-                                    {{ $slot->location?->name }} - {{ $slot->date }} - {{ $slot->start_time }} to {{ $slot->end_time }}
-                                    ({{ $seatsLeft > 0 ? $seatsLeft . ' seats' : 'Full - admin override allowed' }})
-                                </option>
-                            @endforeach
-                        </select>
+                        <span class="text-sm font-medium text-slate-700">Day</span>
+                        <input type="date"
+                               min="{{ now()->toDateString() }}"
+                               data-slot-date-input
+                               class="mt-1 block w-full rounded-md border-slate-300 text-sm shadow-sm focus:border-blue-500 focus:ring-blue-500">
                     </label>
+                    <div class="block">
+                        <span class="text-sm font-medium text-slate-700">Period</span>
+                        <input type="hidden" name="slot_id" data-slot-id>
+                        <div data-slot-period-list class="mt-1 flex min-h-10 flex-wrap gap-2">
+                            <div class="flex min-h-10 items-center rounded-md border border-dashed border-slate-300 px-3 text-sm font-semibold text-slate-500">
+                                Choose a day first.
+                            </div>
+                        </div>
+                        <p data-slot-selected class="mt-1 hidden text-xs font-bold text-blue-700"></p>
+                    </div>
                     <button class="inline-flex h-10 items-center justify-center rounded-md bg-blue-700 px-4 text-sm font-semibold text-white hover:bg-blue-800">
                         Add booking
                     </button>
@@ -225,21 +248,21 @@
                         @forelse($bookings as $booking)
                             <tr class="hover:bg-slate-50">
                                 <td class="whitespace-nowrap px-5 py-4">
-                                    <div class="font-semibold text-slate-900">{{ $booking->user?->name ?? 'Deleted user' }}</div>
-                                    <div class="text-sm text-slate-500">{{ $booking->user?->email }}</div>
+                                    <div class="font-semibold text-slate-900">{{ optional($booking->user)->name ?? 'Deleted user' }}</div>
+                                    <div class="text-sm text-slate-500">{{ optional($booking->user)->email }}</div>
                                 </td>
 
                                 <td class="whitespace-nowrap px-5 py-4 text-sm text-slate-700">
-                                    {{ $booking->slot?->location?->name ?? 'No branch' }}
+                                    {{ optional(optional($booking->slot)->location)->name ?? 'No branch' }}
                                 </td>
 
                                 <td class="whitespace-nowrap px-5 py-4 text-sm text-slate-700">
-                                    {{ $booking->slot?->date ?? 'No date' }}
+                                    {{ optional($booking->slot)->date ?? 'No date' }}
                                 </td>
 
                                 <td class="whitespace-nowrap px-5 py-4 text-sm text-slate-700">
-                                    {{ $booking->slot?->start_time ?? 'No time' }}
-                                    @if($booking->slot?->end_time)
+                                    {{ optional($booking->slot)->start_time ?? 'No time' }}
+                                    @if(optional($booking->slot)->end_time)
                                         <span class="text-slate-400">-</span>
                                         {{ $booking->slot->end_time }}
                                     @endif
@@ -253,9 +276,12 @@
                                 </td>
 
                                 <td class="whitespace-nowrap px-5 py-4 text-sm">
-                                    @if($booking->user?->booking_warning_at)
+                                    @php
+                                        $currentWarningReason = $booking->user?->currentBookingWarningReason();
+                                    @endphp
+                                    @if($currentWarningReason)
                                         <span class="rounded-full bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-800 ring-1 ring-inset ring-amber-200">
-                                            {{ $booking->user->booking_warning_reason }}
+                                            {{ $currentWarningReason }}
                                         </span>
                                     @else
                                         <span class="text-slate-400">None</span>
@@ -295,6 +321,28 @@
     </main>
 </div>
 
+@php
+    $manualBookingStudents = $users->map(function ($user) {
+        return [
+            'id' => $user->id,
+            'name' => $user->name,
+            'email' => $user->email,
+            'phone' => $user->phone,
+        ];
+    })->values();
+
+    $manualBookingSlots = $slots->map(function ($slot) {
+        return [
+            'id' => $slot->id,
+            'date' => \Carbon\Carbon::parse($slot->date)->toDateString(),
+            'start_time' => $slot->start_time,
+            'end_time' => $slot->end_time,
+            'location' => optional($slot->location)->name,
+            'seats_left' => $slot->capacity - $slot->booked_count,
+        ];
+    })->values();
+@endphp
+
 <script>
 const statusLabels = {
     booked: 'Booked',
@@ -312,7 +360,171 @@ const statusClasses = {
     rescheduled: 'bg-violet-50 text-violet-700 ring-violet-200'
 };
 
+const manualBookingStudents = @json($manualBookingStudents);
+const manualBookingSlots = @json($manualBookingSlots);
+
 document.addEventListener('DOMContentLoaded', function () {
+    const studentSearchInput = document.querySelector('[data-student-search-input]');
+    const studentSearchId = document.querySelector('[data-student-search-id]');
+    const studentSearchResults = document.querySelector('[data-student-search-results]');
+    const studentSearchSelected = document.querySelector('[data-student-search-selected]');
+    const slotDateInput = document.querySelector('[data-slot-date-input]');
+    const slotIdInput = document.querySelector('[data-slot-id]');
+    const slotPeriodList = document.querySelector('[data-slot-period-list]');
+    const slotSelected = document.querySelector('[data-slot-selected]');
+
+    function hideStudentResults() {
+        studentSearchResults?.classList.add('hidden');
+    }
+
+    function renderStudentResults(query = '') {
+        if (!studentSearchResults || !studentSearchInput || !studentSearchId) {
+            return;
+        }
+
+        const normalizedQuery = query.trim().toLowerCase();
+        const matches = manualBookingStudents
+            .filter(student => {
+                const haystack = `${student.name || ''} ${student.email || ''} ${student.phone || ''}`.toLowerCase();
+                return normalizedQuery === '' || haystack.includes(normalizedQuery);
+            })
+            .slice(0, 18);
+
+        studentSearchResults.innerHTML = '';
+
+        if (matches.length === 0) {
+            studentSearchResults.innerHTML = '<div class="px-3 py-3 text-sm font-semibold text-slate-500">No students found.</div>';
+            studentSearchResults.classList.remove('hidden');
+            return;
+        }
+
+        matches.forEach(student => {
+            const button = document.createElement('button');
+            button.type = 'button';
+            button.className = 'block w-full border-b border-slate-100 px-3 py-3 text-left last:border-b-0 hover:bg-blue-50';
+            button.innerHTML = `
+                <span class="block text-sm font-extrabold text-slate-950">${student.name || 'Unnamed student'}</span>
+                <span class="mt-0.5 block text-xs font-semibold text-slate-500">${student.phone || 'No phone'} · ${student.email || 'No email'}</span>
+            `;
+            button.addEventListener('click', () => {
+                studentSearchId.value = student.id;
+                studentSearchInput.value = `${student.name || 'Student'}${student.phone ? ' - ' + student.phone : ''}`;
+                if (studentSearchSelected) {
+                    studentSearchSelected.textContent = `Selected: ${student.name || 'Student'}${student.phone ? ' · ' + student.phone : ''}`;
+                    studentSearchSelected.className = 'mt-1 truncate text-xs font-bold text-blue-700';
+                    studentSearchSelected.classList.remove('hidden');
+                }
+                hideStudentResults();
+            });
+            studentSearchResults.appendChild(button);
+        });
+
+        studentSearchResults.classList.remove('hidden');
+    }
+
+    studentSearchInput?.addEventListener('input', function () {
+        studentSearchId.value = '';
+        studentSearchSelected?.classList.add('hidden');
+        renderStudentResults(this.value);
+    });
+
+    studentSearchInput?.addEventListener('focus', function () {
+        renderStudentResults(this.value);
+    });
+
+    document.addEventListener('click', event => {
+        if (!studentSearchResults || !studentSearchInput) {
+            return;
+        }
+
+        if (!studentSearchResults.contains(event.target) && event.target !== studentSearchInput) {
+            hideStudentResults();
+        }
+    });
+
+    document.querySelector('[data-manual-booking-form]')?.addEventListener('submit', event => {
+        if (!studentSearchId?.value) {
+            event.preventDefault();
+            studentSearchInput?.focus();
+            renderStudentResults(studentSearchInput?.value || '');
+            if (studentSearchSelected) {
+                studentSearchSelected.textContent = 'Please choose a student from the search results.';
+                studentSearchSelected.classList.remove('hidden');
+                studentSearchSelected.className = 'mt-1 truncate text-xs font-bold text-rose-700';
+            }
+        }
+
+        if (!slotIdInput?.value) {
+            event.preventDefault();
+            slotDateInput?.focus();
+            renderSlotPeriods();
+            if (slotSelected) {
+                slotSelected.textContent = 'Please choose a day and period.';
+                slotSelected.className = 'mt-1 text-xs font-bold text-rose-700';
+                slotSelected.classList.remove('hidden');
+            }
+        }
+    });
+
+    function formatSlotTime(slot) {
+        return `${String(slot.start_time).slice(0, 5)} - ${String(slot.end_time).slice(0, 5)}`;
+    }
+
+    function renderSlotPeriods() {
+        if (!slotDateInput || !slotIdInput || !slotPeriodList) {
+            return;
+        }
+
+        const selectedDate = slotDateInput.value;
+        slotIdInput.value = '';
+        slotSelected?.classList.add('hidden');
+        slotPeriodList.innerHTML = '';
+
+        if (!selectedDate) {
+            slotPeriodList.innerHTML = '<div class="flex min-h-10 items-center rounded-md border border-dashed border-slate-300 px-3 text-sm font-semibold text-slate-500">Choose a day first.</div>';
+            return;
+        }
+
+        const daySlots = manualBookingSlots.filter(slot => slot.date === selectedDate);
+
+        if (daySlots.length === 0) {
+            slotPeriodList.innerHTML = '<div class="flex min-h-10 items-center rounded-md border border-dashed border-amber-300 bg-amber-50 px-3 text-sm font-semibold text-amber-800">No periods available for this day.</div>';
+            return;
+        }
+
+        daySlots.forEach(slot => {
+            const button = document.createElement('button');
+            const seatsLabel = Number(slot.seats_left) > 0 ? `${slot.seats_left} seats` : 'Full - override';
+            button.type = 'button';
+            button.className = 'min-h-10 min-w-36 rounded-md border border-slate-300 bg-white px-3 py-2 text-left text-sm font-bold text-slate-800 shadow-sm hover:border-blue-500 hover:bg-blue-50 focus:outline-none focus:ring-2 focus:ring-blue-500';
+            button.innerHTML = `
+                <span class="block">${formatSlotTime(slot)}</span>
+                <span class="mt-0.5 block text-xs font-semibold text-slate-500">${slot.location || 'Branch'} · ${seatsLabel}</span>
+            `;
+            button.addEventListener('click', () => {
+                slotIdInput.value = slot.id;
+                slotPeriodList.querySelectorAll('button').forEach(item => {
+                    item.classList.remove('border-blue-700', 'bg-blue-700', 'text-white', 'ring-2', 'ring-blue-200');
+                    item.classList.add('border-slate-300', 'bg-white', 'text-slate-800');
+                    item.querySelectorAll('span')[1]?.classList.remove('text-blue-100');
+                    item.querySelectorAll('span')[1]?.classList.add('text-slate-500');
+                });
+                button.classList.remove('border-slate-300', 'bg-white', 'text-slate-800');
+                button.classList.add('border-blue-700', 'bg-blue-700', 'text-white', 'ring-2', 'ring-blue-200');
+                button.querySelectorAll('span')[1]?.classList.remove('text-slate-500');
+                button.querySelectorAll('span')[1]?.classList.add('text-blue-100');
+                if (slotSelected) {
+                    slotSelected.textContent = `Selected: ${slot.location || 'Branch'} · ${selectedDate} · ${formatSlotTime(slot)}`;
+                    slotSelected.className = 'mt-1 text-xs font-bold text-blue-700';
+                    slotSelected.classList.remove('hidden');
+                }
+            });
+            slotPeriodList.appendChild(button);
+        });
+    }
+
+    slotDateInput?.addEventListener('change', renderSlotPeriods);
+
     document.querySelectorAll('.status-select').forEach(select => {
         select.addEventListener('change', function () {
             const row = this.closest('tr');

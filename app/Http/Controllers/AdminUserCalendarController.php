@@ -3,9 +3,11 @@
 namespace App\Http\Controllers;
 
 use App\Models\Booking;
+use App\Models\ActivityLog;
 use App\Models\AdminNotification;
 use App\Models\BookingLocation;
 use App\Models\Slot;
+use App\Models\User;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -80,6 +82,12 @@ class AdminUserCalendarController extends Controller
             })
             ->groupBy('status')
             ->pluck('total', 'status');
+        $users = User::where('role', 'student')
+            ->when($selectedLocationId, function ($query) use ($selectedLocationId) {
+                $query->where('booking_location_id', $selectedLocationId);
+            })
+            ->orderBy('name')
+            ->get();
 
         return view('admin.users.calendar', [
             'days' => $days,
@@ -104,7 +112,72 @@ class AdminUserCalendarController extends Controller
             'rangeEnd' => $view === 'month' ? $monthEnd : ($view === 'week' ? $startOfWeek->copy()->addDays(6) : $date),
             'locations' => $locations,
             'selectedLocationId' => $selectedLocationId,
+            'users' => $users,
         ]);
+    }
+
+    public function storeManualBooking(Request $request, Slot $slot)
+    {
+        $validated = $request->validate([
+            'user_id' => ['required', 'exists:users,id'],
+        ]);
+
+        $booking = DB::transaction(function () use ($request, $slot, $validated) {
+            $slot = Slot::lockForUpdate()->findOrFail($slot->id);
+            $user = User::where('role', 'student')->findOrFail($validated['user_id']);
+
+            if (! $request->user()->canManageAllBranches() && (int) $slot->booking_location_id !== (int) $request->user()->booking_location_id) {
+                abort(403);
+            }
+
+            if (! $request->user()->canManageAllBranches() && (int) $user->booking_location_id !== (int) $request->user()->booking_location_id) {
+                abort(403);
+            }
+
+            if (! $slot->is_active) {
+                throw ValidationException::withMessages([
+                    'slot_id' => 'This slot is not active.',
+                ]);
+            }
+
+            $exists = Booking::where('user_id', $user->id)
+                ->where('slot_id', $slot->id)
+                ->whereIn('status', ['booked', 'rescheduled'])
+                ->exists();
+
+            if ($exists) {
+                throw ValidationException::withMessages([
+                    'user_id' => 'This student already has an active booking in this slot.',
+                ]);
+            }
+
+            $booking = Booking::create([
+                'user_id' => $user->id,
+                'slot_id' => $slot->id,
+                'status' => 'booked',
+            ]);
+
+            $slot->increment('booked_count');
+
+            AdminNotification::create([
+                'booking_location_id' => $slot->booking_location_id,
+                'user_id' => $user->id,
+                'booking_id' => $booking->id,
+                'type' => 'calendar_manual_booking_created',
+                'title' => 'Calendar manual booking created',
+                'message' => $request->user()->name . ' created a booking for ' . $user->name . ' from Users Calendar.',
+            ]);
+
+            ActivityLog::record('calendar_manual_booking_created', 'Calendar manual booking created', $request->user()->name . ' created a booking for ' . $user->name . '.', [
+                'user_id' => $user->id,
+                'booking_id' => $booking->id,
+                'properties' => ['slot_id' => $slot->id],
+            ]);
+
+            return $booking;
+        });
+
+        return back()->with('success', 'Booking #' . $booking->id . ' created from Users Calendar.');
     }
 
     public function updateBooking(Request $request, Booking $booking)
