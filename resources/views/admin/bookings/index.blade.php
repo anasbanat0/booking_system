@@ -209,6 +209,7 @@
                     </label>
                     <label class="block">
                         <span class="text-sm font-medium text-slate-700">Day</span>
+                        <input type="hidden" name="slot_date" data-slot-date-hidden>
                         <input type="date"
                                min="{{ now()->toDateString() }}"
                                data-slot-date-input
@@ -217,6 +218,7 @@
                     <div class="block">
                         <span class="text-sm font-medium text-slate-700">Period</span>
                         <input type="hidden" name="slot_id" data-slot-id>
+                        <input type="hidden" name="slot_template_id" data-slot-template-id>
                         <div data-slot-period-list class="mt-1 flex min-h-10 flex-wrap gap-2">
                             <div class="flex min-h-10 items-center rounded-md border border-dashed border-slate-300 px-3 text-sm font-semibold text-slate-500">
                                 Choose a day first.
@@ -328,6 +330,7 @@
             'name' => $user->name,
             'email' => $user->email,
             'phone' => $user->phone,
+            'location_id' => $user->booking_location_id,
         ];
     })->values();
 
@@ -338,7 +341,35 @@
             'start_time' => $slot->start_time,
             'end_time' => $slot->end_time,
             'location' => optional($slot->location)->name,
+            'location_id' => $slot->booking_location_id,
             'seats_left' => $slot->capacity - $slot->booked_count,
+        ];
+    })->values();
+
+    $manualBookingSlotTemplates = $slotTemplates->map(function ($template) {
+        return [
+            'id' => $template->id,
+            'start_time' => $template->start_time,
+            'end_time' => $template->end_time,
+            'location' => optional($template->location)->name,
+            'location_id' => $template->booking_location_id,
+            'capacity' => $template->capacity,
+        ];
+    })->values();
+
+    $manualBookingHolidays = $holidays->map(function ($holiday) {
+        return [
+            'date' => \Carbon\Carbon::parse($holiday->date)->toDateString(),
+            'location_id' => $holiday->booking_location_id,
+        ];
+    })->values();
+
+    $manualBookingClosedPeriods = $closedPeriods->map(function ($closedPeriod) {
+        return [
+            'date' => \Carbon\Carbon::parse($closedPeriod->date)->toDateString(),
+            'location_id' => $closedPeriod->booking_location_id,
+            'start_time' => $closedPeriod->start_time,
+            'end_time' => $closedPeriod->end_time,
         ];
     })->values();
 @endphp
@@ -362,6 +393,9 @@ const statusClasses = {
 
 const manualBookingStudents = @json($manualBookingStudents);
 const manualBookingSlots = @json($manualBookingSlots);
+const manualBookingSlotTemplates = @json($manualBookingSlotTemplates);
+const manualBookingHolidays = @json($manualBookingHolidays);
+const manualBookingClosedPeriods = @json($manualBookingClosedPeriods);
 
 document.addEventListener('DOMContentLoaded', function () {
     const studentSearchInput = document.querySelector('[data-student-search-input]');
@@ -369,7 +403,9 @@ document.addEventListener('DOMContentLoaded', function () {
     const studentSearchResults = document.querySelector('[data-student-search-results]');
     const studentSearchSelected = document.querySelector('[data-student-search-selected]');
     const slotDateInput = document.querySelector('[data-slot-date-input]');
+    const slotDateHidden = document.querySelector('[data-slot-date-hidden]');
     const slotIdInput = document.querySelector('[data-slot-id]');
+    const slotTemplateIdInput = document.querySelector('[data-slot-template-id]');
     const slotPeriodList = document.querySelector('[data-slot-period-list]');
     const slotSelected = document.querySelector('[data-slot-selected]');
 
@@ -409,12 +445,14 @@ document.addEventListener('DOMContentLoaded', function () {
             button.addEventListener('click', () => {
                 studentSearchId.value = student.id;
                 studentSearchInput.value = `${student.name || 'Student'}${student.phone ? ' - ' + student.phone : ''}`;
+                studentSearchInput.dataset.locationId = student.location_id || '';
                 if (studentSearchSelected) {
                     studentSearchSelected.textContent = `Selected: ${student.name || 'Student'}${student.phone ? ' · ' + student.phone : ''}`;
                     studentSearchSelected.className = 'mt-1 truncate text-xs font-bold text-blue-700';
                     studentSearchSelected.classList.remove('hidden');
                 }
                 hideStudentResults();
+                renderSlotPeriods();
             });
             studentSearchResults.appendChild(button);
         });
@@ -424,8 +462,13 @@ document.addEventListener('DOMContentLoaded', function () {
 
     studentSearchInput?.addEventListener('input', function () {
         studentSearchId.value = '';
+        studentSearchInput.dataset.locationId = '';
+        slotIdInput.value = '';
+        slotTemplateIdInput.value = '';
+        slotSelected?.classList.add('hidden');
         studentSearchSelected?.classList.add('hidden');
         renderStudentResults(this.value);
+        renderSlotPeriods();
     });
 
     studentSearchInput?.addEventListener('focus', function () {
@@ -454,7 +497,7 @@ document.addEventListener('DOMContentLoaded', function () {
             }
         }
 
-        if (!slotIdInput?.value) {
+        if (!slotIdInput?.value && !slotTemplateIdInput?.value) {
             event.preventDefault();
             slotDateInput?.focus();
             renderSlotPeriods();
@@ -522,6 +565,113 @@ document.addEventListener('DOMContentLoaded', function () {
             slotPeriodList.appendChild(button);
         });
     }
+
+    function isFriday(dateValue) {
+        return new Date(`${dateValue}T00:00:00`).getDay() === 5;
+    }
+
+    function timesOverlap(firstStart, firstEnd, secondStart, secondEnd) {
+        return String(firstStart).slice(0, 5) < String(secondEnd).slice(0, 5)
+            && String(firstEnd).slice(0, 5) > String(secondStart).slice(0, 5);
+    }
+
+    function isTemplateClosedForDay(template, dateValue) {
+        const locationId = Number(template.location_id);
+        const hasHoliday = manualBookingHolidays.some(holiday => {
+            return holiday.date === dateValue
+                && (holiday.location_id === null || Number(holiday.location_id) === locationId);
+        });
+
+        if (hasHoliday) {
+            return true;
+        }
+
+        return manualBookingClosedPeriods.some(period => {
+            return period.date === dateValue
+                && (period.location_id === null || Number(period.location_id) === locationId)
+                && timesOverlap(period.start_time, period.end_time, template.start_time, template.end_time);
+        });
+    }
+
+    renderSlotPeriods = function () {
+        if (!slotDateInput || !slotIdInput || !slotTemplateIdInput || !slotPeriodList) {
+            return;
+        }
+
+        const selectedDate = slotDateInput.value;
+        slotIdInput.value = '';
+        slotTemplateIdInput.value = '';
+        if (slotDateHidden) {
+            slotDateHidden.value = selectedDate;
+        }
+        slotSelected?.classList.add('hidden');
+        slotPeriodList.innerHTML = '';
+
+        if (!studentSearchId?.value) {
+            slotPeriodList.innerHTML = '<div class="flex min-h-10 items-center rounded-md border border-dashed border-slate-300 px-3 text-sm font-semibold text-slate-500">Choose a student first.</div>';
+            return;
+        }
+
+        if (!selectedDate) {
+            slotPeriodList.innerHTML = '<div class="flex min-h-10 items-center rounded-md border border-dashed border-slate-300 px-3 text-sm font-semibold text-slate-500">Choose a day first.</div>';
+            return;
+        }
+
+        if (isFriday(selectedDate)) {
+            slotPeriodList.innerHTML = '<div class="flex min-h-10 items-center rounded-md border border-dashed border-rose-300 bg-rose-50 px-3 text-sm font-semibold text-rose-700">Friday is closed.</div>';
+            return;
+        }
+
+        const selectedStudent = manualBookingStudents.find(student => Number(student.id) === Number(studentSearchId.value));
+        const selectedLocationId = Number(selectedStudent?.location_id || 0);
+        const availableTemplates = manualBookingSlotTemplates
+            .filter(template => Number(template.location_id) === selectedLocationId)
+            .filter(template => !isTemplateClosedForDay(template, selectedDate));
+
+        if (availableTemplates.length === 0) {
+            slotPeriodList.innerHTML = '<div class="flex min-h-10 items-center rounded-md border border-dashed border-amber-300 bg-amber-50 px-3 text-sm font-semibold text-amber-800">No periods available for this day.</div>';
+            return;
+        }
+
+        availableTemplates.forEach(template => {
+            const existingSlot = manualBookingSlots.find(slot => {
+                return slot.date === selectedDate
+                    && Number(slot.location_id) === Number(template.location_id)
+                    && String(slot.start_time).slice(0, 5) === String(template.start_time).slice(0, 5)
+                    && String(slot.end_time).slice(0, 5) === String(template.end_time).slice(0, 5);
+            });
+            const period = existingSlot || template;
+            const button = document.createElement('button');
+            const seatsLeft = existingSlot ? Number(existingSlot.seats_left) : Number(template.capacity);
+            const seatsLabel = seatsLeft > 0 ? `${seatsLeft} seats` : 'Full - override';
+            button.type = 'button';
+            button.className = 'min-h-10 min-w-36 rounded-md border border-slate-300 bg-white px-3 py-2 text-left text-sm font-bold text-slate-800 shadow-sm hover:border-blue-500 hover:bg-blue-50 focus:outline-none focus:ring-2 focus:ring-blue-500';
+            button.innerHTML = `
+                <span class="block">${formatSlotTime(period)}</span>
+                <span class="mt-0.5 block text-xs font-semibold text-slate-500">${period.location || 'Branch'} - ${seatsLabel}</span>
+            `;
+            button.addEventListener('click', () => {
+                slotIdInput.value = existingSlot?.id || '';
+                slotTemplateIdInput.value = template.id;
+                slotPeriodList.querySelectorAll('button').forEach(item => {
+                    item.classList.remove('border-blue-700', 'bg-blue-700', 'text-white', 'ring-2', 'ring-blue-200');
+                    item.classList.add('border-slate-300', 'bg-white', 'text-slate-800');
+                    item.querySelectorAll('span')[1]?.classList.remove('text-blue-100');
+                    item.querySelectorAll('span')[1]?.classList.add('text-slate-500');
+                });
+                button.classList.remove('border-slate-300', 'bg-white', 'text-slate-800');
+                button.classList.add('border-blue-700', 'bg-blue-700', 'text-white', 'ring-2', 'ring-blue-200');
+                button.querySelectorAll('span')[1]?.classList.remove('text-slate-500');
+                button.querySelectorAll('span')[1]?.classList.add('text-blue-100');
+                if (slotSelected) {
+                    slotSelected.textContent = `Selected: ${period.location || 'Branch'} - ${selectedDate} - ${formatSlotTime(period)}`;
+                    slotSelected.className = 'mt-1 text-xs font-bold text-blue-700';
+                    slotSelected.classList.remove('hidden');
+                }
+            });
+            slotPeriodList.appendChild(button);
+        });
+    };
 
     slotDateInput?.addEventListener('change', renderSlotPeriods);
 

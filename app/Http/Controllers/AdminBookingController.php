@@ -6,7 +6,10 @@ use App\Models\Booking;
 use App\Models\ActivityLog;
 use App\Models\AdminNotification;
 use App\Models\BookingLocation;
+use App\Models\ClosedPeriod;
+use App\Models\Holiday;
 use App\Models\Slot;
+use App\Models\SlotTemplate;
 use App\Models\User;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
@@ -100,6 +103,21 @@ class AdminBookingController extends Controller
             ->orderBy('date')
             ->orderBy('start_time')
             ->get();
+        $slotTemplates = SlotTemplate::with('location')
+            ->where('is_active', true)
+            ->whereHas('location', fn ($locationQuery) => $locationQuery->where('is_active', true))
+            ->when($selectedLocationId, function ($templateQuery) use ($selectedLocationId) {
+                $templateQuery->where('booking_location_id', $selectedLocationId);
+            })
+            ->orderBy('booking_location_id')
+            ->orderBy('start_time')
+            ->get();
+        $holidays = Holiday::query()
+            ->whereDate('date', '>=', now()->toDateString())
+            ->get(['booking_location_id', 'date']);
+        $closedPeriods = ClosedPeriod::query()
+            ->whereDate('date', '>=', now()->toDateString())
+            ->get(['booking_location_id', 'date', 'start_time', 'end_time']);
         $periods = Slot::query()
             ->select('start_time', 'end_time')
             ->distinct()
@@ -120,7 +138,10 @@ class AdminBookingController extends Controller
             'selectedLocationId',
             'statsRangePeriod',
             'statsStartDate',
-            'statsEndDate'
+            'statsEndDate',
+            'slotTemplates',
+            'holidays',
+            'closedPeriods'
         ));
     }
 
@@ -128,17 +149,29 @@ class AdminBookingController extends Controller
     {
         $validated = $request->validate([
             'user_id' => ['required', 'exists:users,id'],
-            'slot_id' => ['required', 'exists:slots,id'],
+            'slot_id' => ['nullable', 'exists:slots,id'],
+            'slot_template_id' => ['nullable', 'exists:slot_templates,id'],
+            'slot_date' => ['nullable', 'date'],
         ]);
 
         $email = null;
 
         $booking = $this->transactionWithReconnect(function () use ($request, $validated, &$email) {
-            $slot = Slot::lockForUpdate()->findOrFail($validated['slot_id']);
             $user = User::findOrFail($validated['user_id']);
+            $slot = $this->resolveManualSlot($validated, $user);
 
             if (! $request->user()->canManageAllBranches() && (int) $slot->booking_location_id !== (int) $request->user()->booking_location_id) {
                 abort(403);
+            }
+
+            if (! $request->user()->canManageAllBranches() && (int) $user->booking_location_id !== (int) $request->user()->booking_location_id) {
+                abort(403);
+            }
+
+            if ((int) $slot->booking_location_id !== (int) $user->booking_location_id) {
+                throw ValidationException::withMessages([
+                    'slot_id' => 'This period does not belong to the selected student branch.',
+                ]);
             }
 
             if (! $slot->is_active) {
@@ -296,6 +329,79 @@ class AdminBookingController extends Controller
             'booking_warning_reason' => implode(' and ', $reasons),
             'booking_warning_at' => now(),
         ]);
+    }
+
+    private function resolveManualSlot(array $validated, User $user): Slot
+    {
+        if (! empty($validated['slot_id'])) {
+            return Slot::lockForUpdate()->findOrFail($validated['slot_id']);
+        }
+
+        if (empty($validated['slot_template_id']) || empty($validated['slot_date'])) {
+            throw ValidationException::withMessages([
+                'slot_id' => 'Please choose a day and period.',
+            ]);
+        }
+
+        $date = Carbon::parse($validated['slot_date'])->startOfDay();
+
+        if ($date->isFriday()) {
+            throw ValidationException::withMessages([
+                'slot_date' => 'Friday is closed.',
+            ]);
+        }
+
+        $template = SlotTemplate::where('is_active', true)->findOrFail($validated['slot_template_id']);
+
+        if ((int) $template->booking_location_id !== (int) $user->booking_location_id) {
+            throw ValidationException::withMessages([
+                'slot_template_id' => 'This period does not belong to the selected student branch.',
+            ]);
+        }
+
+        $hasHoliday = Holiday::whereDate('date', $date->toDateString())
+            ->where(function ($query) use ($template) {
+                $query->whereNull('booking_location_id')
+                    ->orWhere('booking_location_id', $template->booking_location_id);
+            })
+            ->exists();
+
+        if ($hasHoliday) {
+            throw ValidationException::withMessages([
+                'slot_date' => 'This day is closed.',
+            ]);
+        }
+
+        $hasClosedPeriod = ClosedPeriod::whereDate('date', $date->toDateString())
+            ->where(function ($query) use ($template) {
+                $query->whereNull('booking_location_id')
+                    ->orWhere('booking_location_id', $template->booking_location_id);
+            })
+            ->whereTime('start_time', '<', $template->end_time)
+            ->whereTime('end_time', '>', $template->start_time)
+            ->exists();
+
+        if ($hasClosedPeriod) {
+            throw ValidationException::withMessages([
+                'slot_template_id' => 'This period is closed.',
+            ]);
+        }
+
+        $slot = Slot::firstOrCreate(
+            [
+                'booking_location_id' => $template->booking_location_id,
+                'date' => $date->toDateString(),
+                'start_time' => $template->start_time,
+                'end_time' => $template->end_time,
+            ],
+            [
+                'capacity' => $template->capacity,
+                'booked_count' => 0,
+                'is_active' => true,
+            ]
+        );
+
+        return Slot::lockForUpdate()->findOrFail($slot->id);
     }
 
     private function sendEmailAfterResponse(?array $email): void
