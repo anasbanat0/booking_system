@@ -37,6 +37,13 @@
         filter: invert(1);
         opacity: 0.75;
     }
+
+    .english-numeric-input {
+        direction: ltr !important;
+        text-align: left !important;
+        unicode-bidi: plaintext;
+        font-variant-numeric: tabular-nums;
+    }
 }
 
 @layer utilities {

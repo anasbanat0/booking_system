@@ -49,6 +49,9 @@ class AdminSiteContentController extends Controller
             'content.*' => ['nullable', 'string'],
             'site_logo_file' => ['nullable', 'image', 'max:4096'],
             'remove_site_logo' => ['nullable', 'boolean'],
+            'hub_logo_files' => ['nullable', 'array'],
+            'hub_logo_files.*' => ['nullable', 'image', 'max:4096'],
+            'remove_hub_logo' => ['nullable', 'array'],
             'supporter_gallery_files' => ['nullable', 'array'],
             'supporter_gallery_files.*' => ['image', 'max:4096'],
             'hero_background_gallery_files' => ['nullable', 'array'],
@@ -77,6 +80,14 @@ class AdminSiteContentController extends Controller
 
         if ($this->canUpdateKey($request, 'site_logo_url')) {
             $this->syncSiteLogo($request);
+        }
+
+        foreach ($locations = BookingLocation::orderBy('name')->get() as $location) {
+            $key = 'hub_' . $location->id . '_logo_url';
+
+            if ($this->canUpdateKey($request, $key)) {
+                $this->syncHubLogo($request, $location->id);
+            }
         }
 
         if ($this->canUpdateKey($request, 'supporter_gallery')) {
@@ -158,6 +169,43 @@ class AdminSiteContentController extends Controller
     private function deleteCurrentLogo(): void
     {
         $path = SiteContent::getValue('site_logo_path', '');
+
+        if ($path !== '') {
+            Storage::disk('public')->delete($path);
+        }
+    }
+
+    private function syncHubLogo(Request $request, int $locationId): void
+    {
+        $urlKey = 'hub_' . $locationId . '_logo_url';
+        $pathKey = 'hub_' . $locationId . '_logo_path';
+
+        if ((bool) $request->input('remove_hub_logo.' . $locationId)) {
+            $this->deleteLogoPath($pathKey);
+
+            SiteContent::updateOrCreate(['key' => $urlKey], ['value' => '']);
+            SiteContent::updateOrCreate(['key' => $pathKey], ['value' => '']);
+
+            return;
+        }
+
+        $file = $request->file('hub_logo_files.' . $locationId);
+
+        if (!$file) {
+            return;
+        }
+
+        $this->deleteLogoPath($pathKey);
+
+        $path = $file->store('hub-logos', 'public');
+
+        SiteContent::updateOrCreate(['key' => $pathKey], ['value' => $path]);
+        SiteContent::updateOrCreate(['key' => $urlKey], ['value' => '/storage/' . ltrim($path, '/')]);
+    }
+
+    private function deleteLogoPath(string $pathKey): void
+    {
+        $path = SiteContent::getValue($pathKey, '');
 
         if ($path !== '') {
             Storage::disk('public')->delete($path);

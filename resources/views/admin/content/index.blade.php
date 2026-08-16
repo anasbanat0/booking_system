@@ -356,9 +356,37 @@
                                     $prefix = 'hub_' . $location->id . '_';
                                     $hubGallery = json_decode($contents[$prefix . 'supporter_gallery']->value ?? '[]', true);
                                     $hubGallery = is_array($hubGallery) ? array_values($hubGallery) : [];
+                                    $hubLogoUrl = $contents[$prefix . 'logo_url']->value ?? '';
                                 @endphp
                                 <section class="rounded-lg border border-slate-200 bg-white p-4">
                                     <h3 class="text-lg font-extrabold text-slate-950">{{ $location->name }} Hub</h3>
+
+                                    <div class="mt-4 rounded-lg border border-slate-200 bg-slate-50 p-4">
+                                        <h4 class="text-sm font-extrabold text-slate-950">{{ $location->name }} dashboard logo</h4>
+                                        <p class="mt-1 text-sm text-slate-500">Shown to students and staff assigned to this hub. If empty, the global site logo is used.</p>
+
+                                        <div class="mt-3 grid gap-4 lg:grid-cols-[13rem_1fr] lg:items-center">
+                                            <div class="flex h-20 w-full items-center justify-center overflow-hidden rounded-xl border border-slate-200 bg-white p-3 shadow-sm">
+                                                <img src="{{ $hubLogoUrl ?: ($siteLogoUrl ?: Vite::asset('resources/images/logo.png')) }}" alt="{{ $location->name }} logo" class="block object-contain" style="max-height: 3.5rem; max-width: 100%; width: auto;">
+                                            </div>
+
+                                            <div class="min-w-0 flex-1">
+                                                <label class="block">
+                                                    <span class="text-sm font-semibold text-slate-700">Upload {{ $location->name }} logo</span>
+                                                    <input type="file" name="hub_logo_files[{{ $location->id }}]" accept="image/*"
+                                                           class="mt-1 block w-full rounded-md border border-slate-300 bg-white text-sm shadow-sm file:me-4 file:border-0 file:bg-slate-950 file:px-4 file:py-2 file:text-sm file:font-bold file:text-white focus:border-blue-500 focus:ring-blue-500">
+                                                </label>
+
+                                                @if($hubLogoUrl)
+                                                    <label class="mt-3 flex items-center gap-2 text-sm font-bold text-rose-700">
+                                                        <input type="checkbox" name="remove_hub_logo[{{ $location->id }}]" value="1" class="rounded border-slate-300 text-rose-600">
+                                                        Remove hub logo and use global logo
+                                                    </label>
+                                                @endif
+                                            </div>
+                                        </div>
+                                    </div>
+
                                     <div class="mt-4 grid gap-4 lg:grid-cols-2">
                                         @foreach($hubFields as $key => $label)
                                             <label class="block">
