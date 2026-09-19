@@ -6,6 +6,8 @@ use Illuminate\Database\Eloquent\Model;
 
 class Slot extends Model
 {
+    public const OCCUPYING_STATUSES = ['booked', 'rescheduled', 'completed', 'no_show'];
+
     protected $fillable = [
         'booking_location_id',
         'date',
@@ -15,9 +17,15 @@ class Slot extends Model
         'booked_count',
         'is_active',
     ];
+
     public function bookings()
     {
         return $this->hasMany(Booking::class);
+    }
+
+    public function occupyingBookings()
+    {
+        return $this->bookings()->whereIn('status', self::OCCUPYING_STATUSES);
     }
 
     public function location()

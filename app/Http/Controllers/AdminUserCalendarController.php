@@ -2,9 +2,9 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\Booking;
 use App\Models\ActivityLog;
 use App\Models\AdminNotification;
+use App\Models\Booking;
 use App\Models\BookingLocation;
 use App\Models\Slot;
 use App\Models\User;
@@ -54,18 +54,18 @@ class AdminUserCalendarController extends Controller
             ->groupBy('booking_location_id')
             ->flatMap(function ($locationSlots) {
                 return $locationSlots
-                    ->unique(fn ($slot) => $slot->start_time . '-' . $slot->end_time)
+                    ->unique(fn ($slot) => $slot->start_time.'-'.$slot->end_time)
                     ->sortBy('start_time')
                     ->values()
                     ->mapWithKeys(fn ($slot, $index) => [
-                        $slot->booking_location_id . '|' . $slot->start_time . '|' . $slot->end_time => $index + 1,
+                        $slot->booking_location_id.'|'.$slot->start_time.'|'.$slot->end_time => $index + 1,
                     ]);
             });
 
         $slotsByDayPeriod = $slots->groupBy(function ($slot) use ($slotPeriodMap) {
-            $period = $slotPeriodMap[$slot->booking_location_id . '|' . $slot->start_time . '|' . $slot->end_time] ?? 1;
+            $period = $slotPeriodMap[$slot->booking_location_id.'|'.$slot->start_time.'|'.$slot->end_time] ?? 1;
 
-            return $slot->date . '|' . $period;
+            return $slot->date.'|'.$period;
         });
         $slotsByDay = $slots->groupBy('date');
         $periods = range(1, max(3, (int) $slotPeriodMap->max()));
@@ -142,7 +142,7 @@ class AdminUserCalendarController extends Controller
 
             $exists = Booking::where('user_id', $user->id)
                 ->where('slot_id', $slot->id)
-                ->whereIn('status', ['booked', 'rescheduled'])
+                ->whereIn('status', Slot::OCCUPYING_STATUSES)
                 ->exists();
 
             if ($exists) {
@@ -165,10 +165,10 @@ class AdminUserCalendarController extends Controller
                 'booking_id' => $booking->id,
                 'type' => 'calendar_manual_booking_created',
                 'title' => 'Calendar manual booking created',
-                'message' => $request->user()->name . ' created a booking for ' . $user->name . ' from Users Calendar.',
+                'message' => $request->user()->name.' created a booking for '.$user->name.' from Users Calendar.',
             ]);
 
-            ActivityLog::record('calendar_manual_booking_created', 'Calendar manual booking created', $request->user()->name . ' created a booking for ' . $user->name . '.', [
+            ActivityLog::record('calendar_manual_booking_created', 'Calendar manual booking created', $request->user()->name.' created a booking for '.$user->name.'.', [
                 'user_id' => $user->id,
                 'booking_id' => $booking->id,
                 'properties' => ['slot_id' => $slot->id],
@@ -177,7 +177,7 @@ class AdminUserCalendarController extends Controller
             return $booking;
         });
 
-        return back()->with('success', 'Booking #' . $booking->id . ' created from Users Calendar.');
+        return back()->with('success', 'Booking #'.$booking->id.' created from Users Calendar.');
     }
 
     public function updateBooking(Request $request, Booking $booking)
@@ -193,24 +193,23 @@ class AdminUserCalendarController extends Controller
             $booking = Booking::with(['slot', 'user'])->lockForUpdate()->findOrFail($booking->id);
             $slot = $booking->slot()->lockForUpdate()->firstOrFail();
 
-            if (!request()->user()->canManageAllBranches() && (int) $slot->booking_location_id !== (int) request()->user()->booking_location_id) {
+            if (! request()->user()->canManageAllBranches() && (int) $slot->booking_location_id !== (int) request()->user()->booking_location_id) {
                 abort(403);
             }
-            $activeStatuses = ['booked', 'rescheduled'];
-            $wasActive = in_array($booking->status, $activeStatuses, true);
-            $willBeActive = in_array($validated['status'], $activeStatuses, true);
+            $wasActive = in_array($booking->status, Slot::OCCUPYING_STATUSES, true);
+            $willBeActive = in_array($validated['status'], Slot::OCCUPYING_STATUSES, true);
 
-            if ($wasActive && !$willBeActive && $slot->booked_count > 0) {
+            if ($wasActive && ! $willBeActive && $slot->booked_count > 0) {
                 $slot->decrement('booked_count');
             }
 
-            if (!$wasActive && $willBeActive && $slot->booked_count >= $slot->capacity) {
+            if (! $wasActive && $willBeActive && $slot->booked_count >= $slot->capacity) {
                 throw ValidationException::withMessages([
                     'status' => 'Cannot activate this booking because the slot is full.',
                 ]);
             }
 
-            if (!$wasActive && $willBeActive) {
+            if (! $wasActive && $willBeActive) {
                 $slot->increment('booked_count');
             }
 
@@ -234,7 +233,7 @@ class AdminUserCalendarController extends Controller
                 'booking_id' => $booking->id,
                 'type' => 'booking_status_updated',
                 'title' => 'Calendar booking updated',
-                'message' => $booking->user?->name . ' was updated from Users Calendar.',
+                'message' => $booking->user?->name.' was updated from Users Calendar.',
             ]);
         });
 

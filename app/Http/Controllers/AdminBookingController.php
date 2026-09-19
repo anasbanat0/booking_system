@@ -2,9 +2,9 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\Booking;
 use App\Models\ActivityLog;
 use App\Models\AdminNotification;
+use App\Models\Booking;
 use App\Models\BookingLocation;
 use App\Models\ClosedPeriod;
 use App\Models\Holiday;
@@ -74,9 +74,9 @@ class AdminBookingController extends Controller
 
         if ($request->filled('search')) {
             $query->whereHas('user', function ($userQuery) use ($request) {
-                $userQuery->where('name', 'like', '%' . $request->search . '%')
-                    ->orWhere('email', 'like', '%' . $request->search . '%')
-                    ->orWhere('phone', 'like', '%' . $request->search . '%');
+                $userQuery->where('name', 'like', '%'.$request->search.'%')
+                    ->orWhere('email', 'like', '%'.$request->search.'%')
+                    ->orWhere('phone', 'like', '%'.$request->search.'%');
             });
         }
 
@@ -182,7 +182,7 @@ class AdminBookingController extends Controller
 
             $exists = Booking::where('user_id', $user->id)
                 ->where('slot_id', $slot->id)
-                ->whereIn('status', ['booked', 'rescheduled'])
+                ->whereIn('status', Slot::OCCUPYING_STATUSES)
                 ->exists();
 
             if ($exists) {
@@ -205,10 +205,10 @@ class AdminBookingController extends Controller
                 'booking_id' => $booking->id,
                 'type' => 'manual_booking_created',
                 'title' => 'Manual booking created',
-                'message' => $request->user()->name . ' created a booking for ' . $user->name . '.',
+                'message' => $request->user()->name.' created a booking for '.$user->name.'.',
             ]);
 
-            ActivityLog::record('manual_booking_created', 'Manual booking created', $request->user()->name . ' created a booking for ' . $user->name . '.', [
+            ActivityLog::record('manual_booking_created', 'Manual booking created', $request->user()->name.' created a booking for '.$user->name.'.', [
                 'user_id' => $user->id,
                 'booking_id' => $booking->id,
                 'properties' => ['slot_id' => $slot->id],
@@ -217,7 +217,7 @@ class AdminBookingController extends Controller
             $email = [
                 'to' => $user->email,
                 'subject' => 'Booking created',
-                'message' => 'A booking was created for you on ' . $slot->date . ' from ' . $slot->start_time . ' to ' . $slot->end_time . '.',
+                'message' => 'A booking was created for you on '.$slot->date.' from '.$slot->start_time.' to '.$slot->end_time.'.',
             ];
 
             return $booking;
@@ -225,7 +225,7 @@ class AdminBookingController extends Controller
 
         $this->sendEmailAfterResponse($email);
 
-        return back()->with('success', 'Manual booking #' . $booking->id . ' created successfully.');
+        return back()->with('success', 'Manual booking #'.$booking->id.' created successfully.');
     }
 
     public function updateStatus(Request $request, $id)
@@ -238,24 +238,23 @@ class AdminBookingController extends Controller
             $booking = Booking::with(['slot', 'user'])->lockForUpdate()->findOrFail($id);
             $slot = $booking->slot()->lockForUpdate()->firstOrFail();
 
-            if (!request()->user()->canManageAllBranches() && (int) $slot->booking_location_id !== (int) request()->user()->booking_location_id) {
+            if (! request()->user()->canManageAllBranches() && (int) $slot->booking_location_id !== (int) request()->user()->booking_location_id) {
                 abort(403);
             }
-            $activeStatuses = ['booked', 'rescheduled'];
-            $wasActive = in_array($booking->status, $activeStatuses, true);
-            $willBeActive = in_array($validated['status'], $activeStatuses, true);
+            $wasActive = in_array($booking->status, Slot::OCCUPYING_STATUSES, true);
+            $willBeActive = in_array($validated['status'], Slot::OCCUPYING_STATUSES, true);
 
-            if (!$wasActive && $willBeActive && $slot->booked_count >= $slot->capacity) {
+            if (! $wasActive && $willBeActive && $slot->booked_count >= $slot->capacity) {
                 throw ValidationException::withMessages([
                     'status' => 'Cannot reactivate this booking because the slot is full.',
                 ]);
             }
 
-            if ($wasActive && !$willBeActive && $slot->booked_count > 0) {
+            if ($wasActive && ! $willBeActive && $slot->booked_count > 0) {
                 $slot->decrement('booked_count');
             }
 
-            if (!$wasActive && $willBeActive) {
+            if (! $wasActive && $willBeActive) {
                 $slot->increment('booked_count');
             }
 
@@ -272,9 +271,9 @@ class AdminBookingController extends Controller
                 'booking_id' => $booking->id,
                 'type' => 'booking_status_updated',
                 'title' => 'Booking status updated',
-                'message' => $booking->user?->name . ' status changed to ' . str_replace('_', ' ', $booking->status) . '.',
+                'message' => $booking->user?->name.' status changed to '.str_replace('_', ' ', $booking->status).'.',
             ]);
-            ActivityLog::record('booking_status_updated', 'Booking status updated', $booking->user?->name . ' status changed to ' . str_replace('_', ' ', $booking->status) . '.', [
+            ActivityLog::record('booking_status_updated', 'Booking status updated', $booking->user?->name.' status changed to '.str_replace('_', ' ', $booking->status).'.', [
                 'user_id' => $booking->user_id,
                 'booking_id' => $booking->id,
                 'properties' => ['status' => $booking->status],
@@ -406,7 +405,7 @@ class AdminBookingController extends Controller
 
     private function sendEmailAfterResponse(?array $email): void
     {
-        if (!$email) {
+        if (! $email) {
             return;
         }
 
@@ -436,7 +435,7 @@ class AdminBookingController extends Controller
                 return $callback();
             }, 3);
         } catch (PDOException $exception) {
-            if ($callbackStarted || !$this->isMysqlGoneAway($exception)) {
+            if ($callbackStarted || ! $this->isMysqlGoneAway($exception)) {
                 throw $exception;
             }
 

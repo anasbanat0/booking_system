@@ -264,7 +264,18 @@
                                             <div class="mb-2 flex items-center justify-between gap-2">
                                                 <div class="min-w-0">
                                                     <p class="truncate text-xs font-extrabold text-slate-600">{{ $slot->location?->name }}</p>
-                                                    <p class="mt-0.5 text-[11px] font-bold text-slate-400">{{ $slot->capacity - $slot->booked_count }} seats left</p>
+                                                    @php
+                                                        $seatsRemaining = $slot->capacity - $slot->booked_count;
+                                                    @endphp
+                                                    @if($seatsRemaining >= 0)
+                                                        <p class="mt-0.5 text-[11px] font-bold text-slate-400">
+                                                            {{ $seatsRemaining }} seats left of {{ $slot->capacity }}
+                                                        </p>
+                                                    @else
+                                                        <p class="mt-0.5 text-[11px] font-extrabold text-rose-500">
+                                                            Full · {{ abs($seatsRemaining) }} over capacity ({{ $slot->capacity }})
+                                                        </p>
+                                                    @endif
                                                 </div>
                                                 <div class="shrink-0 text-right">
                                                     <p class="text-[11px] font-bold text-slate-400">
