@@ -81,6 +81,7 @@
                             <a href="{{ route('admin.manage.users.index') }}" class="inline-flex items-center justify-center rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-bold text-slate-700 hover:bg-slate-100">Clear</a>
                         @endif
                         <button type="button" data-open-modal="bulk-delete-modal" class="rounded-md border border-rose-200 px-4 py-2 text-sm font-bold text-rose-700 hover:bg-rose-50">Delete selected</button>
+                        <button type="button" data-open-modal="password-links-modal" class="rounded-md border border-blue-200 px-4 py-2 text-sm font-bold text-blue-700 hover:bg-blue-50">Send setup links</button>
                     </form>
                 </div>
 
@@ -218,6 +219,24 @@
         <div class="mt-5 flex justify-end gap-2">
             <button type="button" data-close-modal class="rounded-md border border-slate-300 px-4 py-2 text-sm font-bold text-slate-700">Cancel</button>
             <button form="bulk-delete-form" class="rounded-md bg-rose-700 px-4 py-2 text-sm font-bold text-white">Confirm delete</button>
+        </div>
+    </div>
+</div>
+
+<div id="password-links-modal" class="fixed inset-0 z-50 hidden items-center justify-center bg-slate-950/60 p-4" data-modal>
+    <div class="w-full max-w-md rounded-lg bg-white p-5 shadow-xl">
+        <h2 class="text-lg font-bold text-slate-950">Send password setup links?</h2>
+        <p class="mt-2 text-sm leading-6 text-slate-600">
+            Links will be queued for all users matching the current search and role filters. Delivery is spread out to protect the mail server.
+        </p>
+        <div class="mt-5 flex justify-end gap-2">
+            <button type="button" data-close-modal class="rounded-md border border-slate-300 px-4 py-2 text-sm font-bold text-slate-700">Cancel</button>
+            <form method="POST" action="{{ route('admin.manage.users.password-links') }}">
+                @csrf
+                <input type="hidden" name="search" value="{{ request('search') }}">
+                <input type="hidden" name="role" value="{{ request('role') }}">
+                <button class="rounded-md bg-blue-700 px-4 py-2 text-sm font-bold text-white hover:bg-blue-600">Queue links</button>
+            </form>
         </div>
     </div>
 </div>

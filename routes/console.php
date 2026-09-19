@@ -1,14 +1,14 @@
 <?php
 
-use Illuminate\Foundation\Inspiring;
-use Illuminate\Support\Facades\Artisan;
-use Illuminate\Support\Facades\Mail;
-use Illuminate\Support\Facades\Schedule;
 use App\Models\Booking;
 use App\Models\BookingRule;
 use App\Services\SlotGenerationService;
 use App\Services\WhatsAppService;
 use Carbon\Carbon;
+use Illuminate\Foundation\Inspiring;
+use Illuminate\Support\Facades\Artisan;
+use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\Schedule;
 
 Artisan::command('inspire', function () {
     $this->comment(Inspiring::quote());
@@ -31,11 +31,11 @@ Artisan::command('bookings:send-reminders', function () {
         })
         ->chunkById(100, function ($bookings) use ($now, $deadline, &$sent) {
             foreach ($bookings as $booking) {
-                if (!$booking->user || !$booking->slot) {
+                if (! $booking->user || ! $booking->slot) {
                     continue;
                 }
 
-                $startsAt = Carbon::parse($booking->slot->date . ' ' . $booking->slot->start_time);
+                $startsAt = Carbon::parse($booking->slot->date.' '.$booking->slot->start_time);
 
                 if ($startsAt->lessThan($now) || $startsAt->greaterThan($deadline)) {
                     continue;
@@ -46,15 +46,15 @@ Artisan::command('bookings:send-reminders', function () {
                 if ($booking->user->email) {
                     try {
                         Mail::raw(
-                            'Reminder: your booking is scheduled for ' . $booking->slot->date . ' from ' . $booking->slot->start_time . ' to ' . $booking->slot->end_time . ' at ' . ($booking->slot->location?->name ?? 'the hub') . '.',
+                            'Reminder: your booking is scheduled for '.$booking->slot->date.' from '.$booking->slot->start_time.' to '.$booking->slot->end_time.' at '.($booking->slot->location?->name ?? 'the hub').'.',
                             function ($mail) use ($booking) {
                                 $mail->to($booking->user->email)->subject('Booking reminder');
                             }
                         );
 
                         $attempted = true;
-                    } catch (\Throwable $exception) {
-                        $this->warn('Reminder email failed for booking #' . $booking->id . ': ' . $exception->getMessage());
+                    } catch (Throwable $exception) {
+                        $this->warn('Reminder email failed for booking #'.$booking->id.': '.$exception->getMessage());
                     }
                 }
 
@@ -69,7 +69,7 @@ Artisan::command('bookings:send-reminders', function () {
             }
         });
 
-    $this->info($sent . ' booking reminders sent.');
+    $this->info($sent.' booking reminders sent.');
 })->purpose('Send booking reminders before upcoming appointments');
 
 Schedule::command('bookings:send-reminders')->hourly()->withoutOverlapping();
@@ -77,8 +77,9 @@ Schedule::command('bookings:send-reminders')->hourly()->withoutOverlapping();
 Artisan::command('slots:generate-upcoming', function () {
     $result = app(SlotGenerationService::class)->generateUpcomingPeriod(now());
 
-    if (!$result['generated']) {
+    if (! $result['generated']) {
         $this->info($result['reason']);
+
         return;
     }
 
@@ -92,3 +93,7 @@ Artisan::command('slots:generate-upcoming', function () {
 })->purpose('Generate booking slots for the next visible booking period 48 hours before it opens');
 
 Schedule::command('slots:generate-upcoming')->hourly()->withoutOverlapping();
+
+Schedule::command('queue:work database --stop-when-empty --max-time=50 --tries=3')
+    ->everyMinute()
+    ->withoutOverlapping();

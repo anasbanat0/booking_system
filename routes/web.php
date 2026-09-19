@@ -158,6 +158,7 @@ Route::middleware(['auth', 'admin'])->group(function () {
     Route::delete('/admin/manage/users/{user}', [AdminManageUserController::class, 'destroy'])->name('admin.manage.users.destroy');
     Route::post('/admin/manage/users/{user}/restore', [AdminManageUserController::class, 'restore'])->name('admin.manage.users.restore');
     Route::post('/admin/manage/users/{user}/password-link', [AdminManageUserController::class, 'resendPasswordLink'])->name('admin.manage.users.password-link');
+    Route::post('/admin/manage/users/password-links', [AdminManageUserController::class, 'resendPasswordLinks'])->name('admin.manage.users.password-links');
     Route::get('/admin/manage/users/export', [AdminManageUserController::class, 'export'])->name('admin.manage.users.export');
     Route::post('/admin/manage/users/import', [AdminManageUserController::class, 'import'])->name('admin.manage.users.import');
 

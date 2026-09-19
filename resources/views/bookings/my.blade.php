@@ -117,8 +117,10 @@
                             </div>
 
                             @if($isActive)
-                                <div class="rounded-lg bg-stone-50 p-4">
-                                    <form method="POST" action="{{ route('bookings.reschedule', $booking) }}" class="space-y-3">
+                                <div class="rounded-lg bg-stone-50 p-4"
+                                     x-data="{ confirmOpen: false, confirmType: 'reschedule' }"
+                                     @keydown.escape.window="confirmOpen = false">
+                                    <form x-ref="bookingActionForm" method="POST" action="{{ route('bookings.reschedule', $booking) }}" class="space-y-3">
                                         @csrf
                                         <label class="block">
                                             <span class="text-xs font-extrabold uppercase tracking-wide text-stone-500">Reschedule to</span>
@@ -135,11 +137,11 @@
                                         </label>
 
                                         <div class="grid grid-cols-2 gap-2">
-                                            <button @disabled(!$canReschedule || $availableSlots->isEmpty())
+                                            <button type="button" @click="confirmType = 'reschedule'; confirmOpen = true" @disabled(!$canReschedule || $availableSlots->isEmpty())
                                                     class="rounded-md bg-stone-950 px-3 py-2 text-sm font-extrabold text-white hover:bg-stone-800 disabled:cursor-not-allowed disabled:bg-stone-300">
                                                 Reschedule
                                             </button>
-                                            <button formaction="{{ route('bookings.cancel', $booking) }}"
+                                            <button type="button" @click="confirmType = 'cancel'; confirmOpen = true"
                                                     class="rounded-md border border-rose-300 px-3 py-2 text-sm font-extrabold text-rose-700 hover:bg-rose-50">
                                                 Cancel
                                             </button>
@@ -151,6 +153,43 @@
                                     @elseif(!$canReschedule)
                                         <p class="mt-3 text-xs font-medium text-stone-500">Rescheduling opens until {{ $remaining['rescheduleCutoffHours'] }} hours before the booking.</p>
                                     @endif
+
+                                    <template x-teleport="body">
+                                        <div x-show="confirmOpen" x-cloak
+                                             class="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/65 p-4 backdrop-blur-sm"
+                                             role="dialog" aria-modal="true"
+                                             @click.self="confirmOpen = false">
+                                            <div x-show="confirmOpen" x-transition
+                                                 class="w-full max-w-md rounded-lg bg-white p-6 shadow-2xl">
+                                                <p class="text-xs font-extrabold uppercase tracking-wide"
+                                                   :class="confirmType === 'cancel' ? 'text-rose-700' : 'text-blue-700'"
+                                                   x-text="confirmType === 'cancel' ? 'Confirm cancellation' : 'Confirm reschedule'"></p>
+                                                <h3 class="mt-2 text-2xl font-extrabold text-slate-950"
+                                                    x-text="confirmType === 'cancel' ? 'Cancel this booking?' : 'Reschedule this booking?'"></h3>
+                                                <p class="mt-3 text-sm leading-6 text-slate-600"
+                                                   x-text="confirmType === 'cancel' ? 'Your seat will be released. Please confirm that you want to cancel this booking.' : 'Please confirm the new date and time selected before changing your booking.'"></p>
+
+                                                <div class="mt-5 rounded-md border border-slate-200 bg-slate-50 p-4 text-sm">
+                                                    <div class="flex justify-between gap-4">
+                                                        <span class="font-semibold text-slate-500">Current booking</span>
+                                                        <span class="text-right font-extrabold text-slate-950">{{ $booking->slot?->date }} | {{ $booking->slot?->start_time ? substr($booking->slot->start_time, 0, 5) : '--' }} - {{ $booking->slot?->end_time ? substr($booking->slot->end_time, 0, 5) : '--' }}</span>
+                                                    </div>
+                                                </div>
+
+                                                <div class="mt-6 grid grid-cols-2 gap-3">
+                                                    <button type="button" @click="confirmOpen = false"
+                                                            class="rounded-md border border-slate-300 px-4 py-3 text-sm font-extrabold text-slate-700 hover:bg-slate-50">
+                                                        Go back
+                                                    </button>
+                                                    <button type="button"
+                                                            @click="const form = $refs.bookingActionForm; if (confirmType === 'cancel') form.action = '{{ route('bookings.cancel', $booking) }}'; form.submit()"
+                                                            class="rounded-md px-4 py-3 text-sm font-extrabold text-white"
+                                                            :class="confirmType === 'cancel' ? 'bg-rose-700 hover:bg-rose-600' : 'bg-blue-700 hover:bg-blue-600'"
+                                                            x-text="confirmType === 'cancel' ? 'Confirm cancellation' : 'Confirm reschedule'"></button>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </template>
                                 </div>
                             @endif
                         </article>

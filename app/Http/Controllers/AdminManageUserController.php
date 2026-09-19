@@ -2,15 +2,14 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\BookingLocation;
+use App\Jobs\SendPasswordSetupLink;
 use App\Models\ActivityLog;
+use App\Models\BookingLocation;
 use App\Models\User;
-use App\Services\WhatsAppService;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Password;
-use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class AdminManageUserController extends Controller
@@ -25,9 +24,9 @@ class AdminManageUserController extends Controller
 
         if ($request->filled('search')) {
             $query->where(function ($builder) use ($request) {
-                $builder->where('name', 'like', '%' . $request->search . '%')
-                    ->orWhere('email', 'like', '%' . $request->search . '%')
-                    ->orWhere('phone', 'like', '%' . $request->search . '%');
+                $builder->where('name', 'like', '%'.$request->search.'%')
+                    ->orWhere('email', 'like', '%'.$request->search.'%')
+                    ->orWhere('phone', 'like', '%'.$request->search.'%');
             });
         }
 
@@ -71,9 +70,8 @@ class AdminManageUserController extends Controller
             'password' => $validated['password'] ?? 'password',
         ]);
 
-        $this->sendAccountCreatedWhatsAppAfterResponse($user);
-        $this->sendPasswordSetupLinkAfterResponse($user);
-        ActivityLog::record('user_created', 'User created', $user->name . ' was created from Manage Users.', [
+        $this->queuePasswordSetupLink($user->id, 0, true);
+        ActivityLog::record('user_created', 'User created', $user->name.' was created from Manage Users.', [
             'user_id' => $user->id,
             'properties' => ['role' => $user->role],
         ]);
@@ -106,12 +104,12 @@ class AdminManageUserController extends Controller
             'booking_location_id' => $this->resolvedBranchId($request, $validated['role'], $validated['booking_location_id'] ?? null),
         ];
 
-        if (!empty($validated['password'])) {
+        if (! empty($validated['password'])) {
             $payload['password'] = $validated['password'];
         }
 
         $user->update($payload);
-        ActivityLog::record('user_updated', 'User updated', $user->name . ' was updated from Manage Users.', [
+        ActivityLog::record('user_updated', 'User updated', $user->name.' was updated from Manage Users.', [
             'user_id' => $user->id,
             'properties' => ['role' => $user->role],
         ]);
@@ -121,7 +119,7 @@ class AdminManageUserController extends Controller
 
     public function export(): StreamedResponse
     {
-        $filename = 'users-' . now()->format('Y-m-d') . '.csv';
+        $filename = 'users-'.now()->format('Y-m-d').'.csv';
 
         return response()->streamDownload(function () {
             $handle = fopen('php://output', 'w');
@@ -148,12 +146,45 @@ class AdminManageUserController extends Controller
     {
         $this->authorizeUserManagement(request(), $user);
 
-        $this->sendPasswordSetupLinkAfterResponse($user);
-        ActivityLog::record('password_link_sent', 'Password setup link sent', 'A password setup link was sent to ' . $user->email . '.', [
+        $this->queuePasswordSetupLink($user->id, 0);
+        ActivityLog::record('password_link_sent', 'Password setup link sent', 'A password setup link was sent to '.$user->email.'.', [
             'user_id' => $user->id,
         ]);
 
-        return back()->with('success', 'Password setup link sent to ' . $user->email . ' and WhatsApp when a valid phone is available.');
+        return back()->with('success', 'Password setup link queued for '.$user->email.'.');
+    }
+
+    public function resendPasswordLinks(Request $request)
+    {
+        $query = $this->scopedUsers($request);
+
+        if ($request->filled('role')) {
+            $query->where('role', $request->string('role'));
+        }
+
+        if ($request->filled('search')) {
+            $search = $request->string('search')->toString();
+            $query->where(function ($builder) use ($search) {
+                $builder->where('name', 'like', '%'.$search.'%')
+                    ->orWhere('email', 'like', '%'.$search.'%')
+                    ->orWhere('phone', 'like', '%'.$search.'%');
+            });
+        }
+
+        $queued = 0;
+
+        $query->select('id')->orderBy('id')->chunkById(200, function ($users) use (&$queued) {
+            foreach ($users as $user) {
+                $this->queuePasswordSetupLink($user->id, $queued);
+                $queued++;
+            }
+        });
+
+        ActivityLog::record('password_links_queued', 'Password setup links queued', $queued.' password setup links were queued.', [
+            'properties' => ['count' => $queued],
+        ]);
+
+        return back()->with('success', $queued.' password setup link(s) queued for delivery.');
     }
 
     public function import(Request $request)
@@ -167,7 +198,7 @@ class AdminManageUserController extends Controller
         $handle = fopen($request->file('file')->getRealPath(), 'r');
         $header = fgetcsv($handle);
 
-        if (!$header) {
+        if (! $header) {
             return back()->with('error', 'The uploaded file is empty.');
         }
 
@@ -177,6 +208,7 @@ class AdminManageUserController extends Controller
         $skippedRows = [];
         $outsideBranchDuplicates = 0;
         $missingBranchRows = 0;
+        $passwordHashes = [];
 
         while (($row = fgetcsv($handle)) !== false) {
             $row = array_slice(array_pad($row, count($header), null), 0, count($header));
@@ -202,7 +234,7 @@ class AdminManageUserController extends Controller
                 $skippedRows[] = $email;
 
                 if (
-                    !$request->user()->canManageAllBranches()
+                    ! $request->user()->canManageAllBranches()
                     && (int) $existingUser->booking_location_id !== (int) $request->user()->booking_location_id
                 ) {
                     $outsideBranchDuplicates++;
@@ -215,12 +247,16 @@ class AdminManageUserController extends Controller
                 ? ($locations[strtolower(trim($data['branch'] ?? ''))] ?? null)
                 : $request->user()->booking_location_id;
 
-            if ($role !== 'admin' && !$branchId) {
+            if ($role !== 'admin' && ! $branchId) {
                 $skipped++;
                 $missingBranchRows++;
                 $skippedRows[] = $email;
+
                 continue;
             }
+
+            $plainPassword = trim((string) ($data['password'] ?? '')) ?: 'password';
+            $passwordHashes[$plainPassword] ??= Hash::make($plainPassword);
 
             $user = User::create([
                 'name' => trim($data['name']),
@@ -228,12 +264,11 @@ class AdminManageUserController extends Controller
                 'phone' => $phone !== '' ? $phone : null,
                 'role' => $role,
                 'booking_location_id' => $role === 'admin' ? null : $branchId,
-                'password' => $data['password'] ?? 'password',
+                'password' => $passwordHashes[$plainPassword],
             ]);
 
-            $this->sendAccountCreatedWhatsAppAfterResponse($user);
-            $this->sendPasswordSetupLinkAfterResponse($user);
-            ActivityLog::record('user_imported', 'User imported', $user->name . ' was imported or updated from CSV.', [
+            $this->queuePasswordSetupLink($user->id, $imported, true);
+            ActivityLog::record('user_imported', 'User imported', $user->name.' was imported or updated from CSV.', [
                 'user_id' => $user->id,
                 'properties' => ['role' => $user->role],
             ]);
@@ -243,18 +278,18 @@ class AdminManageUserController extends Controller
 
         fclose($handle);
 
-        $message = $imported . ' users imported successfully.';
+        $message = $imported.' users imported successfully.';
 
         if ($skipped > 0) {
-            $message .= ' ' . $skipped . ' duplicate users skipped: ' . implode(', ', array_slice($skippedRows, 0, 5)) . ($skipped > 5 ? '...' : '') . '.';
+            $message .= ' '.$skipped.' duplicate users skipped: '.implode(', ', array_slice($skippedRows, 0, 5)).($skipped > 5 ? '...' : '').'.';
         }
 
         if ($outsideBranchDuplicates > 0) {
-            $message .= ' ' . $outsideBranchDuplicates . ' student(s) already exist in another branch. To add or move them into your branch, please contact the main admin.';
+            $message .= ' '.$outsideBranchDuplicates.' student(s) already exist in another branch. To add or move them into your branch, please contact the main admin.';
         }
 
         if ($missingBranchRows > 0) {
-            $message .= ' ' . $missingBranchRows . ' student/staff row(s) skipped because branch is required.';
+            $message .= ' '.$missingBranchRows.' student/staff row(s) skipped because branch is required.';
         }
 
         return back()->with($skipped > 0 ? 'warning' : 'success', $message);
@@ -273,7 +308,7 @@ class AdminManageUserController extends Controller
         }
 
         $user->delete();
-        ActivityLog::record('user_deleted', 'User moved to trash', $user->name . ' was moved to trash.', [
+        ActivityLog::record('user_deleted', 'User moved to trash', $user->name.' was moved to trash.', [
             'user_id' => $user->id,
         ]);
 
@@ -301,12 +336,12 @@ class AdminManageUserController extends Controller
 
         foreach ($users as $user) {
             $user->delete();
-            ActivityLog::record('user_deleted', 'User moved to trash', $user->name . ' was moved to trash.', [
+            ActivityLog::record('user_deleted', 'User moved to trash', $user->name.' was moved to trash.', [
                 'user_id' => $user->id,
             ]);
         }
 
-        return back()->with('success', $users->count() . ' users moved to trash.');
+        return back()->with('success', $users->count().' users moved to trash.');
     }
 
     public function restore(Request $request, int $user)
@@ -314,7 +349,7 @@ class AdminManageUserController extends Controller
         $trashedUser = $this->scopedUsers($request)->onlyTrashed()->findOrFail($user);
         $trashedUser->restore();
 
-        ActivityLog::record('user_restored', 'User restored', $trashedUser->name . ' was restored from trash.', [
+        ActivityLog::record('user_restored', 'User restored', $trashedUser->name.' was restored from trash.', [
             'user_id' => $trashedUser->id,
         ]);
 
@@ -324,7 +359,7 @@ class AdminManageUserController extends Controller
     private function scopedUsers(Request $request)
     {
         return User::query()
-            ->when(!$request->user()->canManageAllBranches(), function ($query) use ($request) {
+            ->when(! $request->user()->canManageAllBranches(), function ($query) use ($request) {
                 $query->where('role', 'student')
                     ->where('booking_location_id', $request->user()->booking_location_id);
             });
@@ -352,7 +387,7 @@ class AdminManageUserController extends Controller
             return false;
         }
 
-        return !User::where('role', 'admin')->whereKeyNot($user->id)->exists();
+        return ! User::where('role', 'admin')->whereKeyNot($user->id)->exists();
     }
 
     private function resolvedBranchId(Request $request, string $role, ?int $branchId): ?int
@@ -361,12 +396,12 @@ class AdminManageUserController extends Controller
             return null;
         }
 
-        if (!$request->user()->canManageAllBranches()) {
+        if (! $request->user()->canManageAllBranches()) {
             return $request->user()->booking_location_id;
         }
 
-        if (!$branchId) {
-            throw \Illuminate\Validation\ValidationException::withMessages([
+        if (! $branchId) {
+            throw ValidationException::withMessages([
                 'booking_location_id' => 'Branch is required for students and staff.',
             ]);
         }
@@ -374,29 +409,9 @@ class AdminManageUserController extends Controller
         return $branchId;
     }
 
-    private function sendAccountCreatedWhatsAppAfterResponse(User $user): void
+    private function queuePasswordSetupLink(int $userId, int $position, bool $sendAccountCreatedMessage = false): void
     {
-        app()->terminating(function () use ($user) {
-            app(WhatsAppService::class)->sendAccountCreated($user);
-        });
-    }
-
-    private function sendPasswordSetupLinkAfterResponse(User $user): void
-    {
-        app()->terminating(function () use ($user) {
-            $this->sendPasswordSetupChannels($user);
-        });
-    }
-
-    private function sendPasswordSetupChannels(User $user): void
-    {
-        $status = Password::sendResetLink(['email' => $user->email]);
-
-        if ($status !== Password::RESET_LINK_SENT) {
-            Log::warning('Password setup link could not be generated.', [
-                'user_id' => $user->id,
-                'status' => $status,
-            ]);
-        }
+        SendPasswordSetupLink::dispatch($userId, $sendAccountCreatedMessage)
+            ->delay(now()->addSeconds($position * 8));
     }
 }
