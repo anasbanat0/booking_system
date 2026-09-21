@@ -61,4 +61,67 @@ class AdminUserImportTest extends TestCase
 
         Notification::assertSentTo($user, ResetPassword::class);
     }
+
+    public function test_manual_creation_restores_a_deleted_account_instead_of_crashing_on_unique_email(): void
+    {
+        Queue::fake();
+
+        $admin = User::factory()->create(['role' => 'admin']);
+        $deletedUser = User::factory()->create([
+            'name' => 'Old Name',
+            'email' => 'returning@example.com',
+            'phone' => '+972500000001',
+            'role' => 'student',
+        ]);
+        $deletedUser->delete();
+
+        $response = $this->actingAs($admin)->post(route('admin.manage.users.store'), [
+            'name' => 'Returning Admin',
+            'email' => 'RETURNING@example.com',
+            'phone' => '+972500000001',
+            'role' => 'admin',
+            'password' => '',
+        ]);
+
+        $response->assertRedirect()->assertSessionHas('success');
+        $this->assertDatabaseCount('users', 2);
+        $this->assertDatabaseHas('users', [
+            'id' => $deletedUser->id,
+            'name' => 'Returning Admin',
+            'email' => 'returning@example.com',
+            'role' => 'admin',
+            'deleted_at' => null,
+        ]);
+        Queue::assertPushed(SendPasswordSetupLink::class, fn ($job) => $job->userId === $deletedUser->id);
+    }
+
+    public function test_manual_creation_reports_when_email_and_phone_match_different_deleted_accounts(): void
+    {
+        Queue::fake();
+
+        $admin = User::factory()->create(['role' => 'admin']);
+        $emailOwner = User::factory()->create([
+            'email' => 'email-owner@example.com',
+            'phone' => '+972500000002',
+        ]);
+        $phoneOwner = User::factory()->create([
+            'email' => 'phone-owner@example.com',
+            'phone' => '+972500000003',
+        ]);
+        $emailOwner->delete();
+        $phoneOwner->delete();
+
+        $response = $this->actingAs($admin)
+            ->from(route('admin.manage.users.index'))
+            ->post(route('admin.manage.users.store'), [
+                'name' => 'Conflicting User',
+                'email' => $emailOwner->email,
+                'phone' => $phoneOwner->phone,
+                'role' => 'admin',
+            ]);
+
+        $response->assertRedirect(route('admin.manage.users.index'))
+            ->assertSessionHasErrors(['email', 'phone']);
+        Queue::assertNothingPushed();
+    }
 }

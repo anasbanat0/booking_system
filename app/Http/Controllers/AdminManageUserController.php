@@ -7,6 +7,7 @@ use App\Models\ActivityLog;
 use App\Models\BookingLocation;
 use App\Models\User;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
@@ -60,11 +61,70 @@ class AdminManageUserController extends Controller
         ]);
 
         $branchId = $this->resolvedBranchId($request, $validated['role'], $validated['booking_location_id'] ?? null);
+        $email = strtolower(trim($validated['email']));
+        $phone = filled($validated['phone'] ?? null) ? trim($validated['phone']) : null;
+        $deletedMatches = User::onlyTrashed()
+            ->where(function ($query) use ($email, $phone) {
+                $query->where('email', $email);
+
+                if ($phone) {
+                    $query->orWhere('phone', $phone);
+                }
+            })
+            ->get();
+
+        if ($deletedMatches->count() > 1) {
+            throw ValidationException::withMessages([
+                'email' => 'The email and phone belong to different deleted accounts. Restore or edit them from Trash first.',
+                'phone' => 'The email and phone belong to different deleted accounts. Restore or edit them from Trash first.',
+            ]);
+        }
+
+        $deletedUser = $deletedMatches->first();
+
+        if (
+            $deletedUser
+            && ! $request->user()->canManageAllBranches()
+            && (int) $deletedUser->booking_location_id !== (int) $request->user()->booking_location_id
+        ) {
+            throw ValidationException::withMessages([
+                'email' => 'This deleted account belongs to another branch. Please contact the main admin to restore or move it.',
+            ]);
+        }
+
+        if ($deletedUser) {
+            $user = DB::transaction(function () use ($deletedUser, $validated, $branchId, $email, $phone) {
+                $payload = [
+                    'name' => $validated['name'],
+                    'email' => $email,
+                    'phone' => $phone,
+                    'role' => $validated['role'],
+                    'booking_location_id' => $branchId,
+                ];
+
+                if (filled($validated['password'] ?? null)) {
+                    $payload['password'] = $validated['password'];
+                }
+
+                $deletedUser->update($payload);
+                $deletedUser->restore();
+
+                return $deletedUser->fresh();
+            });
+
+            $this->queuePasswordSetupLink($user->id, 0, true);
+            ActivityLog::record('user_restored', 'Deleted user restored', $user->name.' was restored and updated from Add user manually.', [
+                'user_id' => $user->id,
+                'properties' => ['role' => $user->role],
+            ]);
+
+            return back()->with('success', 'The deleted account was restored and updated successfully. A password setup link was queued.');
+        }
 
         $user = User::create([
             'name' => $validated['name'],
-            'email' => $validated['email'],
-            'phone' => $validated['phone'] ?? null,
+            'email' => $email,
+            'phone' => $phone,
             'role' => $validated['role'],
             'booking_location_id' => $branchId,
             'password' => $validated['password'] ?? 'password',
