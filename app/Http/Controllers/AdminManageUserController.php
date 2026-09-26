@@ -2,13 +2,13 @@
 
 namespace App\Http\Controllers;
 
+use App\Jobs\ImportUsersCsvChunk;
 use App\Jobs\SendPasswordSetupLink;
 use App\Models\ActivityLog;
 use App\Models\BookingLocation;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 use Symfony\Component\HttpFoundation\StreamedResponse;
@@ -253,8 +253,6 @@ class AdminManageUserController extends Controller
             'file' => ['required', 'file', 'mimes:csv,txt'],
         ]);
 
-        $locations = BookingLocation::pluck('id', 'name')
-            ->mapWithKeys(fn ($id, $name) => [strtolower(trim($name)) => $id]);
         $handle = fopen($request->file('file')->getRealPath(), 'r');
         $header = fgetcsv($handle);
 
@@ -262,97 +260,65 @@ class AdminManageUserController extends Controller
             return back()->with('error', 'The uploaded file is empty.');
         }
 
-        $header = array_map(fn ($value) => strtolower(trim($value)), $header);
-        $imported = 0;
-        $skipped = 0;
-        $skippedRows = [];
-        $outsideBranchDuplicates = 0;
-        $missingBranchRows = 0;
-        $passwordHashes = [];
+        $header = array_map(
+            fn ($value) => strtolower(trim((string) $value, "\xEF\xBB\xBF \t\n\r\0\x0B")),
+            $header,
+        );
+
+        if (! in_array('name', $header, true) || ! in_array('email', $header, true)) {
+            fclose($handle);
+
+            throw ValidationException::withMessages([
+                'file' => 'The CSV must contain name and email columns.',
+            ]);
+        }
+
+        $rows = [];
 
         while (($row = fgetcsv($handle)) !== false) {
             $row = array_slice(array_pad($row, count($header), null), 0, count($header));
-            $data = array_combine($header, $row);
-            $role = in_array($data['role'] ?? 'student', $request->user()->canManageAllBranches() ? ['student', 'staff', 'admin'] : ['student'], true) ? $data['role'] : 'student';
+            $data = array_combine($header, array_map(function ($value) {
+                $value = (string) ($value ?? '');
 
-            if (empty($data['email']) || empty($data['name'])) {
+                return mb_check_encoding($value, 'UTF-8')
+                    ? $value
+                    : mb_convert_encoding($value, 'UTF-8', ['Windows-1256', 'ISO-8859-1']);
+            }, $row));
+
+            if (blank($data['email'] ?? null) && blank($data['name'] ?? null)) {
                 continue;
             }
 
-            $email = trim($data['email']);
-            $phone = trim($data['phone'] ?? '');
-            $existingUser = User::withTrashed()->where(function ($query) use ($email, $phone) {
-                $query->where('email', $email);
-
-                if ($phone !== '') {
-                    $query->orWhere('phone', $phone);
-                }
-            })->first();
-
-            if ($existingUser) {
-                $skipped++;
-                $skippedRows[] = $email;
-
-                if (
-                    ! $request->user()->canManageAllBranches()
-                    && (int) $existingUser->booking_location_id !== (int) $request->user()->booking_location_id
-                ) {
-                    $outsideBranchDuplicates++;
-                }
-
-                continue;
-            }
-
-            $branchId = $request->user()->canManageAllBranches()
-                ? ($locations[strtolower(trim($data['branch'] ?? ''))] ?? null)
-                : $request->user()->booking_location_id;
-
-            if ($role !== 'admin' && ! $branchId) {
-                $skipped++;
-                $missingBranchRows++;
-                $skippedRows[] = $email;
-
-                continue;
-            }
-
-            $plainPassword = trim((string) ($data['password'] ?? '')) ?: 'password';
-            $passwordHashes[$plainPassword] ??= Hash::make($plainPassword);
-
-            $user = User::create([
-                'name' => trim($data['name']),
-                'email' => $email,
-                'phone' => $phone !== '' ? $phone : null,
-                'role' => $role,
-                'booking_location_id' => $role === 'admin' ? null : $branchId,
-                'password' => $passwordHashes[$plainPassword],
-            ]);
-
-            $this->queuePasswordSetupLink($user->id, $imported, true);
-            ActivityLog::record('user_imported', 'User imported', $user->name.' was imported or updated from CSV.', [
-                'user_id' => $user->id,
-                'properties' => ['role' => $user->role],
-            ]);
-
-            $imported++;
+            $rows[] = $data;
         }
 
         fclose($handle);
 
-        $message = $imported.' users imported successfully.';
-
-        if ($skipped > 0) {
-            $message .= ' '.$skipped.' duplicate users skipped: '.implode(', ', array_slice($skippedRows, 0, 5)).($skipped > 5 ? '...' : '').'.';
+        if ($rows === []) {
+            return back()->with('error', 'The CSV does not contain any user rows.');
         }
 
-        if ($outsideBranchDuplicates > 0) {
-            $message .= ' '.$outsideBranchDuplicates.' student(s) already exist in another branch. To add or move them into your branch, please contact the main admin.';
+        $locations = BookingLocation::pluck('id', 'name')
+            ->mapWithKeys(fn ($id, $name) => [strtolower(trim($name)) => $id])
+            ->all();
+
+        foreach (array_chunk($rows, 50, true) as $chunk) {
+            $offset = (int) array_key_first($chunk);
+            ImportUsersCsvChunk::dispatch(
+                array_values($chunk),
+                $locations,
+                $request->user()->id,
+                $request->user()->canManageAllBranches(),
+                $request->user()->booking_location_id,
+                $offset,
+            );
         }
 
-        if ($missingBranchRows > 0) {
-            $message .= ' '.$missingBranchRows.' student/staff row(s) skipped because branch is required.';
-        }
+        ActivityLog::record('user_import_queued', 'CSV user import queued', count($rows).' CSV rows were queued for background import.', [
+            'properties' => ['rows' => count($rows), 'chunks' => (int) ceil(count($rows) / 50)],
+        ]);
 
-        return back()->with($skipped > 0 ? 'warning' : 'success', $message);
+        return back()->with('success', count($rows).' CSV row(s) queued for import. Users will appear progressively while the background queue runs.');
     }
 
     public function destroy(Request $request, User $user)

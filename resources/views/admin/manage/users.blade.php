@@ -51,7 +51,7 @@
                         <a href="{{ route('admin.manage.users.export') }}" class="rounded-md bg-slate-950 px-4 py-2 text-sm font-bold text-white hover:bg-slate-800">Export</a>
                     </div>
                     <div class="mt-4 rounded-md bg-slate-50 p-3 text-xs text-slate-600">
-                        Duplicates are checked by email and phone. Existing users are skipped, not overwritten.
+                        Large files are processed safely in background batches. Existing users are skipped, so a previously interrupted file can be uploaded again to complete only the missing accounts.
                     </div>
                     <form method="POST" action="{{ route('admin.manage.users.import') }}" enctype="multipart/form-data" class="mt-4 flex gap-2">
                         @csrf

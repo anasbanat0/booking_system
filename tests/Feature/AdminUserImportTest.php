@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Jobs\ImportUsersCsvChunk;
 use App\Jobs\SendPasswordSetupLink;
 use App\Models\BookingLocation;
 use App\Models\User;
@@ -16,7 +17,7 @@ class AdminUserImportTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_admin_can_import_800_users_and_password_setup_links_are_queued(): void
+    public function test_admin_can_queue_an_800_user_csv_without_processing_it_in_the_web_request(): void
     {
         Queue::fake();
 
@@ -33,8 +34,42 @@ class AdminUserImportTest extends TestCase
         ]);
 
         $response->assertRedirect()->assertSessionHas('success');
-        $this->assertDatabaseCount('users', 801);
-        Queue::assertPushed(SendPasswordSetupLink::class, 800);
+        $this->assertDatabaseCount('users', 1);
+        Queue::assertPushed(ImportUsersCsvChunk::class, 16);
+        Queue::assertNotPushed(SendPasswordSetupLink::class);
+    }
+
+    public function test_csv_chunk_imports_users_and_queues_their_password_setup_links(): void
+    {
+        Queue::fake();
+
+        $admin = User::factory()->create(['role' => 'admin']);
+        $location = BookingLocation::query()->firstOrFail();
+        $locations = [strtolower($location->name) => $location->id];
+        $rows = [
+            [
+                'name' => 'First Student',
+                'email' => 'first.student@example.com',
+                'phone' => '+972500000010',
+                'role' => 'student',
+                'branch' => $location->name,
+                'password' => '',
+            ],
+            [
+                'name' => 'Second Student',
+                'email' => 'second.student@example.com',
+                'phone' => '+972500000011',
+                'role' => 'student',
+                'branch' => $location->name,
+                'password' => '',
+            ],
+        ];
+
+        (new ImportUsersCsvChunk($rows, $locations, $admin->id, true, null))->handle();
+
+        $this->assertDatabaseHas('users', ['email' => 'first.student@example.com']);
+        $this->assertDatabaseHas('users', ['email' => 'second.student@example.com']);
+        Queue::assertPushed(SendPasswordSetupLink::class, 2);
         Queue::assertPushed(SendPasswordSetupLink::class, fn ($job) => $job->sendAccountCreatedMessage);
     }
 
