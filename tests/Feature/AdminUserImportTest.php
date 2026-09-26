@@ -37,7 +37,7 @@ class AdminUserImportTest extends TestCase
             'file' => UploadedFile::fake()->createWithContent('students.csv', implode("\n", $rows)),
         ]);
 
-        $response->assertRedirect()->assertSessionHas('success');
+        $response->assertRedirect(route('admin.manage.users.index', ['import' => 'queued']));
         $this->assertDatabaseCount('users', 1);
         Queue::assertPushed(PrepareUsersCsvImport::class, 1);
         Queue::assertNotPushed(ImportUsersCsvChunk::class);

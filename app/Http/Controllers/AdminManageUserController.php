@@ -9,7 +9,6 @@ use App\Models\BookingLocation;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
@@ -282,33 +281,13 @@ class AdminManageUserController extends Controller
                 $request->user()->booking_location_id,
             );
 
-            ActivityLog::record('user_import_queued', 'CSV user import queued', 'A CSV file was queued for background import.', [
-                'properties' => ['file' => $uploadedFile->getClientOriginalName()],
-            ]);
-
-            Log::warning('CSV user import accepted.', [
-                'actor_id' => $request->user()->id,
-                'file' => $uploadedFile->getClientOriginalName(),
-                'path' => $path,
-            ]);
-
             return redirect()
-                ->route('admin.manage.users.index')
-                ->with('success', 'The CSV file was queued for import. Users will appear progressively while the background queue runs.');
+                ->route('admin.manage.users.index', ['import' => 'queued']);
         } catch (ValidationException $exception) {
             throw $exception;
-        } catch (\Throwable $exception) {
-            Log::error('CSV import request failed.', [
-                'actor_id' => $request->user()?->id,
-                'file' => $uploadedFile?->getClientOriginalName(),
-                'exception' => $exception->getMessage(),
-            ]);
-
+        } catch (\Throwable) {
             return redirect()
-                ->route('admin.manage.users.index')
-                ->withErrors([
-                    'file' => 'The CSV could not be imported. No additional action is needed until the reported file error is corrected.',
-                ]);
+                ->route('admin.manage.users.index', ['import' => 'failed']);
         }
     }
 

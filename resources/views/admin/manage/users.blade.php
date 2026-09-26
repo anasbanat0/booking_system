@@ -7,6 +7,15 @@
     <main class="min-w-0 flex-1">
         <div class="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
             @include('admin.partials.topbar')
+            @if(request('import') === 'queued')
+                <div class="mb-6 rounded-md border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-800">
+                    The CSV file was queued successfully. Users will appear progressively while it is processed.
+                </div>
+            @elseif(request('import') === 'failed')
+                <div class="mb-6 rounded-md border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-semibold text-rose-800">
+                    The CSV file could not be queued. Please verify the file and try again.
+                </div>
+            @endif
             <div class="mb-8">
                 <p class="text-sm font-semibold uppercase tracking-wide text-blue-700">Manage</p>
                 <h1 class="mt-2 text-3xl font-bold text-slate-950">Users</h1>
