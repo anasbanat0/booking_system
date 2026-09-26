@@ -292,7 +292,9 @@ class AdminManageUserController extends Controller
                 'path' => $path,
             ]);
 
-            return back()->with('success', 'The CSV file was queued for import. Users will appear progressively while the background queue runs.');
+            return redirect()
+                ->route('admin.manage.users.index')
+                ->with('success', 'The CSV file was queued for import. Users will appear progressively while the background queue runs.');
         } catch (ValidationException $exception) {
             throw $exception;
         } catch (\Throwable $exception) {
@@ -302,9 +304,11 @@ class AdminManageUserController extends Controller
                 'exception' => $exception->getMessage(),
             ]);
 
-            return back()->withErrors([
-                'file' => 'The CSV could not be imported. No additional action is needed until the reported file error is corrected.',
-            ]);
+            return redirect()
+                ->route('admin.manage.users.index')
+                ->withErrors([
+                    'file' => 'The CSV could not be imported. No additional action is needed until the reported file error is corrected.',
+                ]);
         }
     }
 

@@ -206,6 +206,10 @@ class AdminUserImportTest extends TestCase
         (new SendPasswordSetupLink($user->id))->handle();
 
         Notification::assertSentTo($user, ResetPassword::class);
+        $this->assertDatabaseHas('activity_logs', [
+            'user_id' => $user->id,
+            'type' => 'password_setup_link_accepted',
+        ]);
     }
 
     public function test_manual_creation_restores_a_deleted_account_instead_of_crashing_on_unique_email(): void

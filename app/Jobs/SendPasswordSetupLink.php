@@ -2,6 +2,7 @@
 
 namespace App\Jobs;
 
+use App\Models\ActivityLog;
 use App\Models\User;
 use App\Services\WhatsAppService;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -37,6 +38,7 @@ class SendPasswordSetupLink implements ShouldQueue
         if ($status === Password::RESET_THROTTLED) {
             Log::notice('Password setup link skipped because a recent link is still valid.', [
                 'user_id' => $user->id,
+                'email' => $user->email,
             ]);
 
             return;
@@ -45,12 +47,40 @@ class SendPasswordSetupLink implements ShouldQueue
         if ($status !== Password::RESET_LINK_SENT) {
             throw new RuntimeException('Password setup link failed with status: '.$status);
         }
+
+        ActivityLog::record(
+            'password_setup_link_accepted',
+            'Password setup link accepted',
+            'The mail provider accepted the password setup message for delivery.',
+            [
+                'user_id' => $user->id,
+                'properties' => ['email' => $user->email],
+            ],
+        );
+
+        Log::info('Password setup link accepted by mail provider.', [
+            'user_id' => $user->id,
+            'email' => $user->email,
+        ]);
     }
 
     public function failed(?\Throwable $exception): void
     {
+        $user = User::find($this->userId);
+
+        ActivityLog::record(
+            'password_setup_link_failed',
+            'Password setup link failed',
+            $exception?->getMessage(),
+            [
+                'user_id' => $user?->id,
+                'properties' => ['email' => $user?->email],
+            ],
+        );
+
         Log::error('Password setup link job failed.', [
             'user_id' => $this->userId,
+            'email' => $user?->email,
             'exception' => $exception?->getMessage(),
         ]);
     }
