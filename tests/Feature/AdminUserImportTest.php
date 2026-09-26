@@ -71,6 +71,29 @@ class AdminUserImportTest extends TestCase
         Storage::disk('local')->assertMissing('imports/students.csv');
     }
 
+    public function test_queued_csv_file_is_kept_when_preparation_fails_so_it_can_be_retried(): void
+    {
+        Queue::fake();
+        Storage::fake('local');
+
+        $admin = User::factory()->create(['role' => 'admin']);
+        Storage::disk('local')->put('imports/invalid.csv', "wrong,columns\nvalue,value");
+
+        try {
+            (new PrepareUsersCsvImport(
+                'imports/invalid.csv',
+                [],
+                $admin->id,
+                true,
+                null,
+            ))->handle();
+
+            $this->fail('Expected the invalid CSV to be rejected.');
+        } catch (ValidationException) {
+            Storage::disk('local')->assertExists('imports/invalid.csv');
+        }
+    }
+
     public function test_csv_chunk_imports_users_and_queues_their_password_setup_links(): void
     {
         Queue::fake();
@@ -131,7 +154,7 @@ class AdminUserImportTest extends TestCase
         }
 
         Queue::assertNotPushed(ImportUsersCsvChunk::class);
-        Storage::disk('local')->assertMissing('imports/duplicate.csv');
+        Storage::disk('local')->assertExists('imports/duplicate.csv');
     }
 
     public function test_admin_can_queue_setup_links_for_existing_users(): void

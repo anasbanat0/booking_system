@@ -29,6 +29,7 @@ class PrepareUsersCsvImport implements ShouldQueue
     public function handle(): void
     {
         $handle = null;
+        $prepared = false;
 
         try {
             $handle = fopen(Storage::disk('local')->path($this->path), 'rb');
@@ -98,12 +99,16 @@ class PrepareUsersCsvImport implements ShouldQueue
                 'rows' => $rowCount,
                 'chunks' => $chunkCount,
             ]);
+
+            $prepared = true;
         } finally {
             if (is_resource($handle)) {
                 fclose($handle);
             }
 
-            Storage::disk('local')->delete($this->path);
+            if ($prepared) {
+                Storage::disk('local')->delete($this->path);
+            }
         }
     }
 

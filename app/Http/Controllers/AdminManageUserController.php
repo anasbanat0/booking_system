@@ -10,6 +10,7 @@ use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
@@ -266,6 +267,12 @@ class AdminManageUserController extends Controller
                 (string) Str::uuid().'.csv',
                 'local',
             );
+
+            $storedFile = Storage::disk('local')->path($path);
+
+            if (! chmod($storedFile, 0644)) {
+                throw new \RuntimeException('The queued CSV file permissions could not be prepared.');
+            }
 
             PrepareUsersCsvImport::dispatch(
                 $path,
