@@ -250,75 +250,126 @@ class AdminManageUserController extends Controller
     public function import(Request $request)
     {
         $request->validate([
-            'file' => ['required', 'file', 'mimes:csv,txt'],
+            'file' => ['required', 'file', 'mimes:csv,txt', 'max:20480'],
         ]);
 
-        $handle = fopen($request->file('file')->getRealPath(), 'r');
-        $header = fgetcsv($handle);
+        $uploadedFile = $request->file('file');
+        $handle = null;
 
-        if (! $header) {
-            return back()->with('error', 'The uploaded file is empty.');
-        }
+        try {
+            $handle = fopen($uploadedFile->getRealPath(), 'rb');
 
-        $header = array_map(
-            fn ($value) => strtolower(trim((string) $value, "\xEF\xBB\xBF \t\n\r\0\x0B")),
-            $header,
-        );
-
-        if (! in_array('name', $header, true) || ! in_array('email', $header, true)) {
-            fclose($handle);
-
-            throw ValidationException::withMessages([
-                'file' => 'The CSV must contain name and email columns.',
-            ]);
-        }
-
-        $rows = [];
-
-        while (($row = fgetcsv($handle)) !== false) {
-            $row = array_slice(array_pad($row, count($header), null), 0, count($header));
-            $data = array_combine($header, array_map(function ($value) {
-                $value = (string) ($value ?? '');
-
-                return mb_check_encoding($value, 'UTF-8')
-                    ? $value
-                    : mb_convert_encoding($value, 'UTF-8', ['Windows-1256', 'ISO-8859-1']);
-            }, $row));
-
-            if (blank($data['email'] ?? null) && blank($data['name'] ?? null)) {
-                continue;
+            if ($handle === false) {
+                throw new \RuntimeException('The uploaded CSV file could not be opened.');
             }
 
-            $rows[] = $data;
-        }
+            $header = fgetcsv($handle);
 
-        fclose($handle);
+            if (! $header) {
+                return back()->withErrors(['file' => 'The uploaded file is empty.']);
+            }
 
-        if ($rows === []) {
-            return back()->with('error', 'The CSV does not contain any user rows.');
-        }
-
-        $locations = BookingLocation::pluck('id', 'name')
-            ->mapWithKeys(fn ($id, $name) => [strtolower(trim($name)) => $id])
-            ->all();
-
-        foreach (array_chunk($rows, 50, true) as $chunk) {
-            $offset = (int) array_key_first($chunk);
-            ImportUsersCsvChunk::dispatch(
-                array_values($chunk),
-                $locations,
-                $request->user()->id,
-                $request->user()->canManageAllBranches(),
-                $request->user()->booking_location_id,
-                $offset,
+            $header = array_map(
+                fn ($value) => strtolower(trim((string) $value, "\xEF\xBB\xBF \t\n\r\0\x0B")),
+                $header,
             );
+
+            if (! in_array('name', $header, true) || ! in_array('email', $header, true)) {
+                throw ValidationException::withMessages([
+                    'file' => 'The CSV must contain name and email columns.',
+                ]);
+            }
+
+            if (count(array_unique($header)) !== count($header)) {
+                throw ValidationException::withMessages([
+                    'file' => 'The CSV contains duplicate column names.',
+                ]);
+            }
+
+            $locations = BookingLocation::pluck('id', 'name')
+                ->mapWithKeys(fn ($id, $name) => [strtolower(trim($name)) => $id])
+                ->all();
+            $chunk = [];
+            $rowCount = 0;
+            $chunkCount = 0;
+            $rowNumber = 1;
+
+            while (($row = fgetcsv($handle)) !== false) {
+                $rowNumber++;
+                $row = array_slice(array_pad($row, count($header), null), 0, count($header));
+                $data = array_combine($header, array_map(function ($value) {
+                    $value = (string) ($value ?? '');
+
+                    return mb_check_encoding($value, 'UTF-8')
+                        ? $value
+                        : mb_convert_encoding($value, 'UTF-8', ['Windows-1256', 'ISO-8859-1']);
+                }, $row));
+
+                if (blank($data['email'] ?? null) && blank($data['name'] ?? null)) {
+                    continue;
+                }
+
+                $chunk[] = $data;
+                $rowCount++;
+
+                if (count($chunk) === 50) {
+                    $this->dispatchImportChunk($request, $chunk, $locations, $rowCount - count($chunk));
+                    $chunk = [];
+                    $chunkCount++;
+                }
+            }
+
+            if ($chunk !== []) {
+                $this->dispatchImportChunk($request, $chunk, $locations, $rowCount - count($chunk));
+                $chunkCount++;
+            }
+
+            if ($rowCount === 0) {
+                return back()->withErrors(['file' => 'The CSV does not contain any user rows.']);
+            }
+
+            ActivityLog::record('user_import_queued', 'CSV user import queued', $rowCount.' CSV rows were queued for background import.', [
+                'properties' => ['rows' => $rowCount, 'chunks' => $chunkCount],
+            ]);
+
+            Log::warning('CSV user import accepted.', [
+                'actor_id' => $request->user()->id,
+                'file' => $uploadedFile->getClientOriginalName(),
+                'rows' => $rowCount,
+                'chunks' => $chunkCount,
+            ]);
+
+            return back()->with('success', $rowCount.' CSV row(s) queued for import. Users will appear progressively while the background queue runs.');
+        } catch (ValidationException $exception) {
+            throw $exception;
+        } catch (\Throwable $exception) {
+            Log::error('CSV import request failed.', [
+                'actor_id' => $request->user()?->id,
+                'file' => $uploadedFile?->getClientOriginalName(),
+                'row' => $rowNumber ?? null,
+                'exception' => $exception->getMessage(),
+            ]);
+
+            return back()->withErrors([
+                'file' => 'The CSV could not be imported. No additional action is needed until the reported file error is corrected.',
+            ]);
+        } finally {
+            if (is_resource($handle)) {
+                fclose($handle);
+            }
         }
+    }
 
-        ActivityLog::record('user_import_queued', 'CSV user import queued', count($rows).' CSV rows were queued for background import.', [
-            'properties' => ['rows' => count($rows), 'chunks' => (int) ceil(count($rows) / 50)],
-        ]);
-
-        return back()->with('success', count($rows).' CSV row(s) queued for import. Users will appear progressively while the background queue runs.');
+    private function dispatchImportChunk(Request $request, array $chunk, array $locations, int $offset): void
+    {
+        ImportUsersCsvChunk::dispatch(
+            $chunk,
+            $locations,
+            $request->user()->id,
+            $request->user()->canManageAllBranches(),
+            $request->user()->booking_location_id,
+            $offset,
+        );
     }
 
     public function destroy(Request $request, User $user)

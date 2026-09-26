@@ -58,6 +58,9 @@
                         <input type="file" name="file" accept=".csv,.txt" class="min-w-0 flex-1 rounded-md border-slate-300 text-sm">
                         <button class="rounded-md border border-slate-300 px-3 py-2 text-sm font-bold text-slate-700 hover:bg-slate-100">Import</button>
                     </form>
+                    @error('file')
+                        <p class="mt-2 text-sm font-semibold text-rose-700">{{ $message }}</p>
+                    @enderror
                 </section>
             </div>
 

@@ -73,6 +73,25 @@ class AdminUserImportTest extends TestCase
         Queue::assertPushed(SendPasswordSetupLink::class, fn ($job) => $job->sendAccountCreatedMessage);
     }
 
+    public function test_csv_with_duplicate_headers_returns_a_visible_validation_error(): void
+    {
+        Queue::fake();
+
+        $admin = User::factory()->create(['role' => 'admin']);
+        $response = $this->actingAs($admin)
+            ->from(route('admin.manage.users.index'))
+            ->post(route('admin.manage.users.import'), [
+                'file' => UploadedFile::fake()->createWithContent(
+                    'students.csv',
+                    "name,email,email\nStudent,student@example.com,duplicate@example.com",
+                ),
+            ]);
+
+        $response->assertRedirect(route('admin.manage.users.index'))
+            ->assertSessionHasErrors('file');
+        Queue::assertNothingPushed();
+    }
+
     public function test_admin_can_queue_setup_links_for_existing_users(): void
     {
         Queue::fake();

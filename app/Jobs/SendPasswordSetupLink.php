@@ -34,6 +34,14 @@ class SendPasswordSetupLink implements ShouldQueue
 
         $status = Password::sendResetLink(['email' => $user->email]);
 
+        if ($status === Password::RESET_THROTTLED) {
+            Log::notice('Password setup link skipped because a recent link is still valid.', [
+                'user_id' => $user->id,
+            ]);
+
+            return;
+        }
+
         if ($status !== Password::RESET_LINK_SENT) {
             throw new RuntimeException('Password setup link failed with status: '.$status);
         }
