@@ -67,13 +67,10 @@ class PrepareUsersCsvImport implements ShouldQueue
 
             while (($row = fgetcsv($handle)) !== false) {
                 $row = array_slice(array_pad($row, count($header), null), 0, count($header));
-                $data = array_combine($header, array_map(function ($value) {
-                    $value = (string) ($value ?? '');
-
-                    return mb_check_encoding($value, 'UTF-8')
-                        ? $value
-                        : mb_convert_encoding($value, 'UTF-8', ['Windows-1256', 'ISO-8859-1']);
-                }, $row));
+                $data = array_combine($header, array_map(
+                    fn ($value) => $this->normalizeEncoding((string) ($value ?? '')),
+                    $row,
+                ));
 
                 if (blank($data['email'] ?? null) && blank($data['name'] ?? null)) {
                     continue;
@@ -122,6 +119,23 @@ class PrepareUsersCsvImport implements ShouldQueue
             $this->actorBranchId,
             $offset,
         );
+    }
+
+    private function normalizeEncoding(string $value): string
+    {
+        if (mb_check_encoding($value, 'UTF-8')) {
+            return $value;
+        }
+
+        if (function_exists('iconv')) {
+            $converted = iconv('CP1256', 'UTF-8//IGNORE', $value);
+
+            if ($converted !== false) {
+                return $converted;
+            }
+        }
+
+        return mb_convert_encoding($value, 'UTF-8', 'ISO-8859-1');
     }
 
     public function failed(?\Throwable $exception): void

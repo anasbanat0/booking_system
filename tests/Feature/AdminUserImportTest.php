@@ -94,6 +94,33 @@ class AdminUserImportTest extends TestCase
         }
     }
 
+    public function test_queued_csv_accepts_cp1256_text_when_mbstring_does_not_support_windows_1256(): void
+    {
+        Queue::fake();
+        Storage::fake('local');
+
+        $admin = User::factory()->create(['role' => 'admin']);
+        $location = BookingLocation::query()->firstOrFail();
+        $arabicName = iconv('UTF-8', 'CP1256', 'احمد');
+        Storage::disk('local')->put(
+            'imports/cp1256.csv',
+            "name,email,phone,role,branch,password\n{$arabicName},cp1256@example.com,,student,{$location->name},",
+        );
+
+        (new PrepareUsersCsvImport(
+            'imports/cp1256.csv',
+            [strtolower($location->name) => $location->id],
+            $admin->id,
+            true,
+            null,
+        ))->handle();
+
+        Queue::assertPushed(ImportUsersCsvChunk::class, function ($job) {
+            return $job->rows[0]['name'] === 'احمد';
+        });
+        Storage::disk('local')->assertMissing('imports/cp1256.csv');
+    }
+
     public function test_csv_chunk_imports_users_and_queues_their_password_setup_links(): void
     {
         Queue::fake();
