@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Jobs\ImportUsersCsvChunk;
+use App\Jobs\PrepareUsersCsvImport;
 use App\Jobs\SendPasswordSetupLink;
 use App\Models\BookingLocation;
 use App\Models\User;
@@ -11,6 +12,8 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Queue;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Validation\ValidationException;
 use Tests\TestCase;
 
 class AdminUserImportTest extends TestCase
@@ -20,6 +23,7 @@ class AdminUserImportTest extends TestCase
     public function test_admin_can_queue_an_800_user_csv_without_processing_it_in_the_web_request(): void
     {
         Queue::fake();
+        Storage::fake('local');
 
         $admin = User::factory()->create(['role' => 'admin']);
         $location = BookingLocation::query()->firstOrFail();
@@ -35,8 +39,36 @@ class AdminUserImportTest extends TestCase
 
         $response->assertRedirect()->assertSessionHas('success');
         $this->assertDatabaseCount('users', 1);
-        Queue::assertPushed(ImportUsersCsvChunk::class, 16);
+        Queue::assertPushed(PrepareUsersCsvImport::class, 1);
+        Queue::assertNotPushed(ImportUsersCsvChunk::class);
         Queue::assertNotPushed(SendPasswordSetupLink::class);
+    }
+
+    public function test_queued_csv_file_is_split_into_small_background_chunks(): void
+    {
+        Queue::fake();
+        Storage::fake('local');
+
+        $admin = User::factory()->create(['role' => 'admin']);
+        $location = BookingLocation::query()->firstOrFail();
+        $rows = ['name,email,phone,role,branch,password'];
+
+        for ($index = 1; $index <= 800; $index++) {
+            $rows[] = "Student {$index},student{$index}@example.com,,student,{$location->name},";
+        }
+
+        Storage::disk('local')->put('imports/students.csv', implode("\n", $rows));
+
+        (new PrepareUsersCsvImport(
+            'imports/students.csv',
+            [strtolower($location->name) => $location->id],
+            $admin->id,
+            true,
+            null,
+        ))->handle();
+
+        Queue::assertPushed(ImportUsersCsvChunk::class, 32);
+        Storage::disk('local')->assertMissing('imports/students.csv');
     }
 
     public function test_csv_chunk_imports_users_and_queues_their_password_setup_links(): void
@@ -76,20 +108,30 @@ class AdminUserImportTest extends TestCase
     public function test_csv_with_duplicate_headers_returns_a_visible_validation_error(): void
     {
         Queue::fake();
+        Storage::fake('local');
 
         $admin = User::factory()->create(['role' => 'admin']);
-        $response = $this->actingAs($admin)
-            ->from(route('admin.manage.users.index'))
-            ->post(route('admin.manage.users.import'), [
-                'file' => UploadedFile::fake()->createWithContent(
-                    'students.csv',
-                    "name,email,email\nStudent,student@example.com,duplicate@example.com",
-                ),
-            ]);
+        Storage::disk('local')->put(
+            'imports/duplicate.csv',
+            "name,email,email\nStudent,student@example.com,duplicate@example.com",
+        );
 
-        $response->assertRedirect(route('admin.manage.users.index'))
-            ->assertSessionHasErrors('file');
-        Queue::assertNothingPushed();
+        try {
+            (new PrepareUsersCsvImport(
+                'imports/duplicate.csv',
+                [],
+                $admin->id,
+                true,
+                null,
+            ))->handle();
+
+            $this->fail('Expected duplicate CSV headers to be rejected.');
+        } catch (ValidationException $exception) {
+            $this->assertArrayHasKey('file', $exception->errors());
+        }
+
+        Queue::assertNotPushed(ImportUsersCsvChunk::class);
+        Storage::disk('local')->assertMissing('imports/duplicate.csv');
     }
 
     public function test_admin_can_queue_setup_links_for_existing_users(): void

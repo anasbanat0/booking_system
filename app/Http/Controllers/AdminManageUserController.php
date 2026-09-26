@@ -2,7 +2,7 @@
 
 namespace App\Http\Controllers;
 
-use App\Jobs\ImportUsersCsvChunk;
+use App\Jobs\PrepareUsersCsvImport;
 use App\Jobs\SendPasswordSetupLink;
 use App\Models\ActivityLog;
 use App\Models\BookingLocation;
@@ -10,6 +10,7 @@ use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 use Symfony\Component\HttpFoundation\StreamedResponse;
@@ -255,122 +256,49 @@ class AdminManageUserController extends Controller
         ]);
 
         $uploadedFile = $request->file('file');
-        $handle = null;
 
         try {
-            $handle = fopen($uploadedFile->getRealPath(), 'rb');
-
-            if ($handle === false) {
-                throw new \RuntimeException('The uploaded CSV file could not be opened.');
-            }
-
-            $header = fgetcsv($handle);
-
-            if (! $header) {
-                return back()->withErrors(['file' => 'The uploaded file is empty.']);
-            }
-
-            $header = array_map(
-                fn ($value) => strtolower(trim((string) $value, "\xEF\xBB\xBF \t\n\r\0\x0B")),
-                $header,
-            );
-
-            if (! in_array('name', $header, true) || ! in_array('email', $header, true)) {
-                throw ValidationException::withMessages([
-                    'file' => 'The CSV must contain name and email columns.',
-                ]);
-            }
-
-            if (count(array_unique($header)) !== count($header)) {
-                throw ValidationException::withMessages([
-                    'file' => 'The CSV contains duplicate column names.',
-                ]);
-            }
-
             $locations = BookingLocation::pluck('id', 'name')
                 ->mapWithKeys(fn ($id, $name) => [strtolower(trim($name)) => $id])
                 ->all();
-            $chunk = [];
-            $rowCount = 0;
-            $chunkCount = 0;
-            $rowNumber = 1;
+            $path = $uploadedFile->storeAs(
+                'imports',
+                (string) Str::uuid().'.csv',
+                'local',
+            );
 
-            while (($row = fgetcsv($handle)) !== false) {
-                $rowNumber++;
-                $row = array_slice(array_pad($row, count($header), null), 0, count($header));
-                $data = array_combine($header, array_map(function ($value) {
-                    $value = (string) ($value ?? '');
+            PrepareUsersCsvImport::dispatch(
+                $path,
+                $locations,
+                $request->user()->id,
+                $request->user()->canManageAllBranches(),
+                $request->user()->booking_location_id,
+            );
 
-                    return mb_check_encoding($value, 'UTF-8')
-                        ? $value
-                        : mb_convert_encoding($value, 'UTF-8', ['Windows-1256', 'ISO-8859-1']);
-                }, $row));
-
-                if (blank($data['email'] ?? null) && blank($data['name'] ?? null)) {
-                    continue;
-                }
-
-                $chunk[] = $data;
-                $rowCount++;
-
-                if (count($chunk) === 50) {
-                    $this->dispatchImportChunk($request, $chunk, $locations, $rowCount - count($chunk));
-                    $chunk = [];
-                    $chunkCount++;
-                }
-            }
-
-            if ($chunk !== []) {
-                $this->dispatchImportChunk($request, $chunk, $locations, $rowCount - count($chunk));
-                $chunkCount++;
-            }
-
-            if ($rowCount === 0) {
-                return back()->withErrors(['file' => 'The CSV does not contain any user rows.']);
-            }
-
-            ActivityLog::record('user_import_queued', 'CSV user import queued', $rowCount.' CSV rows were queued for background import.', [
-                'properties' => ['rows' => $rowCount, 'chunks' => $chunkCount],
+            ActivityLog::record('user_import_queued', 'CSV user import queued', 'A CSV file was queued for background import.', [
+                'properties' => ['file' => $uploadedFile->getClientOriginalName()],
             ]);
 
             Log::warning('CSV user import accepted.', [
                 'actor_id' => $request->user()->id,
                 'file' => $uploadedFile->getClientOriginalName(),
-                'rows' => $rowCount,
-                'chunks' => $chunkCount,
+                'path' => $path,
             ]);
 
-            return back()->with('success', $rowCount.' CSV row(s) queued for import. Users will appear progressively while the background queue runs.');
+            return back()->with('success', 'The CSV file was queued for import. Users will appear progressively while the background queue runs.');
         } catch (ValidationException $exception) {
             throw $exception;
         } catch (\Throwable $exception) {
             Log::error('CSV import request failed.', [
                 'actor_id' => $request->user()?->id,
                 'file' => $uploadedFile?->getClientOriginalName(),
-                'row' => $rowNumber ?? null,
                 'exception' => $exception->getMessage(),
             ]);
 
             return back()->withErrors([
                 'file' => 'The CSV could not be imported. No additional action is needed until the reported file error is corrected.',
             ]);
-        } finally {
-            if (is_resource($handle)) {
-                fclose($handle);
-            }
         }
-    }
-
-    private function dispatchImportChunk(Request $request, array $chunk, array $locations, int $offset): void
-    {
-        ImportUsersCsvChunk::dispatch(
-            $chunk,
-            $locations,
-            $request->user()->id,
-            $request->user()->canManageAllBranches(),
-            $request->user()->booking_location_id,
-            $offset,
-        );
     }
 
     public function destroy(Request $request, User $user)
