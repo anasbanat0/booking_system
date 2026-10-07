@@ -171,12 +171,30 @@
                         </p>
 
                         @if(!$selectedLocation && $locations->count() > 1)
-                            <div class="mt-5 grid grid-cols-1 gap-2 sm:grid-cols-2">
+                            <div class="mt-5 overflow-hidden rounded-lg border border-stone-200 bg-white/70">
                                 @foreach($locations as $location)
-                                    <a href="{{ route('login.hub', $location->slug) }}"
-                                       class="flex items-center justify-center rounded-md border border-[#2f6fa3] bg-[#2f6fa3] px-4 py-3 text-sm font-extrabold text-white transition hover:border-[#255a84] hover:bg-[#255a84]">
-                                        {{ $location->name }} Hub
-                                    </a>
+                                    @php
+                                        $registrationLink = ($registrationLinks ?? collect())
+                                            ->first(fn ($link) => $link['location']->is($location));
+                                    @endphp
+                                    <div class="flex min-h-16 items-center justify-between gap-3 px-3 py-3 {{ $loop->last ? '' : 'border-b border-stone-200' }}">
+                                        <p class="min-w-0 text-sm font-black leading-5 text-slate-950">{{ $location->name }} Hub</p>
+                                        <div class="flex shrink-0 items-center gap-2">
+                                            <a href="{{ route('login.hub', $location->slug) }}"
+                                               class="flex h-9 items-center justify-center rounded-md border border-stone-300 bg-white px-3 text-xs font-extrabold text-stone-700 transition hover:bg-stone-100 focus:outline-none focus:ring-2 focus:ring-[#2f6fa3] focus:ring-offset-2">
+                                                <span>Login</span>
+                                            </a>
+                                            @if($registrationLink)
+                                                <a href="{{ $registrationLink['url'] }}"
+                                                   target="_blank"
+                                                   rel="noopener noreferrer"
+                                                   title="Open {{ $location->name }} registration form"
+                                                   class="flex h-9 items-center justify-center rounded-md border border-[#2f6fa3] bg-[#2f6fa3] px-3 text-xs font-extrabold text-white transition hover:border-[#255a84] hover:bg-[#255a84] focus:outline-none focus:ring-2 focus:ring-[#2f6fa3] focus:ring-offset-2">
+                                                    <span>{{ $registrationLink['label'] }}</span>
+                                                </a>
+                                            @endif
+                                        </div>
+                                    </div>
                                 @endforeach
                             </div>
                         @else
@@ -195,6 +213,7 @@
                                 </a>
                             @endguest
                         @endif
+
                     </div>
 
                     <div class="mt-5 rounded-lg border border-stone-200 p-5">

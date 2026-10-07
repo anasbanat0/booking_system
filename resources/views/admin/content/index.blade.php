@@ -187,6 +187,56 @@
                         <textarea name="content[team_card_description]" rows="3"
                                   class="mt-1 block w-full rounded-md border-slate-300 text-sm shadow-sm focus:border-blue-500 focus:ring-blue-500">{{ old('content.team_card_description', $contents['team_card_description']->value ?? '') }}</textarea>
                     </label>
+
+                    <div class="mt-5 border-t border-slate-200 pt-5">
+                        <div class="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
+                            <div>
+                                <h3 class="text-sm font-extrabold text-slate-950">Student registration forms</h3>
+                                <p class="mt-1 text-sm text-slate-500">These buttons open the branch registration forms in a new tab.</p>
+                            </div>
+                        </div>
+
+                        <div class="mt-4 grid gap-4 lg:grid-cols-2">
+                            @foreach($locations as $location)
+                                @php
+                                    $labelKey = 'hub_' . $location->id . '_registration_button_label';
+                                    $urlKey = 'hub_' . $location->id . '_registration_url';
+                                    $defaultRegistrationUrl = match ($location->slug) {
+                                        'gaza' => 'https://forms.gle/GgCcdxxgnzUMq8917',
+                                        'khan-younis' => 'https://forms.gle/SkBLXMDVkS8uNqyy7',
+                                        default => '',
+                                    };
+                                    $registrationLabel = $contents[$labelKey]->value ?? 'Register';
+                                    if ($registrationLabel === 'Register for ' . $location->name . ' Hub') {
+                                        $registrationLabel = 'Register';
+                                    }
+                                @endphp
+                                <div class="rounded-lg border border-slate-200 bg-white p-4">
+                                    <div class="flex items-center gap-2">
+                                        <span class="flex h-8 w-8 items-center justify-center rounded-md bg-blue-50 text-blue-700">
+                                            <i class="fa-solid fa-user-plus" aria-hidden="true"></i>
+                                        </span>
+                                        <h4 class="text-sm font-extrabold text-slate-950">{{ $location->name }} Hub</h4>
+                                    </div>
+
+                                    <label class="mt-4 block">
+                                        <span class="text-sm font-semibold text-slate-700">Button text</span>
+                                        <input name="content[{{ $labelKey }}]"
+                                               value="{{ old('content.' . $labelKey, $registrationLabel) }}"
+                                               class="mt-1 block w-full rounded-md border-slate-300 text-sm shadow-sm focus:border-blue-500 focus:ring-blue-500">
+                                    </label>
+
+                                    <label class="mt-3 block">
+                                        <span class="text-sm font-semibold text-slate-700">Google Form URL</span>
+                                        <input type="url" name="content[{{ $urlKey }}]"
+                                               value="{{ old('content.' . $urlKey, $contents[$urlKey]->value ?? $defaultRegistrationUrl) }}"
+                                               placeholder="https://forms.gle/..."
+                                               class="mt-1 block w-full rounded-md border-slate-300 text-sm shadow-sm focus:border-blue-500 focus:ring-blue-500">
+                                    </label>
+                                </div>
+                            @endforeach
+                        </div>
+                    </div>
                 </div>
 
                 @if($canManageAllBranches)

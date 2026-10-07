@@ -37,7 +37,7 @@ class ImportUsersCsvChunk implements ShouldQueue
         foreach ($this->rows as $index => $data) {
             $name = trim((string) ($data['name'] ?? ''));
             $email = strtolower(trim((string) ($data['email'] ?? '')));
-            $phone = trim((string) ($data['phone'] ?? ''));
+            $phone = $this->normalizePhone((string) ($data['phone'] ?? ''));
 
             if ($name === '' || $email === '' || ! filter_var($email, FILTER_VALIDATE_EMAIL)) {
                 $skipped++;
@@ -49,18 +49,14 @@ class ImportUsersCsvChunk implements ShouldQueue
             $requestedRole = strtolower(trim((string) ($data['role'] ?? 'student')));
             $role = in_array($requestedRole, $allowedRoles, true) ? $requestedRole : 'student';
 
-            $existingUser = User::withTrashed()->where(function ($query) use ($email, $phone) {
-                $query->where('email', $email);
-
-                if ($phone !== '') {
-                    $query->orWhere('phone', $phone);
-                }
-            })->first();
-
-            if ($existingUser) {
+            if (User::withTrashed()->where('email', $email)->exists()) {
                 $skipped++;
 
                 continue;
+            }
+
+            if ($phone !== null && User::withTrashed()->where('phone', $phone)->exists()) {
+                $phone = null;
             }
 
             $branchName = strtolower(trim((string) ($data['branch'] ?? '')));
@@ -81,7 +77,7 @@ class ImportUsersCsvChunk implements ShouldQueue
                 $user = User::create([
                     'name' => $name,
                     'email' => $email,
-                    'phone' => $phone !== '' ? $phone : null,
+                    'phone' => $phone,
                     'role' => $role,
                     'booking_location_id' => $role === 'admin' ? null : $branchId,
                     'password' => $passwordHashes[$plainPassword],
@@ -115,5 +111,16 @@ class ImportUsersCsvChunk implements ShouldQueue
             'imported' => $imported,
             'skipped' => $skipped,
         ]);
+    }
+
+    private function normalizePhone(string $phone): ?string
+    {
+        $phone = trim($phone);
+
+        if ($phone === '' || preg_match('/^[\d.]+E[+-]\d+$/i', $phone)) {
+            return null;
+        }
+
+        return $phone;
     }
 }

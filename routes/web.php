@@ -1,23 +1,20 @@
 <?php
 
+use App\Http\Controllers\AdminActivityLogController;
+use App\Http\Controllers\AdminBookingController;
 use App\Http\Controllers\AdminController;
+use App\Http\Controllers\AdminManageUserController;
+use App\Http\Controllers\AdminNotificationController;
 use App\Http\Controllers\AdminSiteContentController;
 use App\Http\Controllers\AdminSlotSettingsController;
 use App\Http\Controllers\AdminUserCalendarController;
-use App\Http\Controllers\AdminManageUserController;
-use App\Http\Controllers\AdminNotificationController;
-use App\Http\Controllers\AdminActivityLogController;
 use App\Http\Controllers\BookingController;
 use App\Http\Controllers\CalendarController;
 use App\Http\Controllers\ProfileController;
-use App\Models\Booking;
 use App\Models\BookingLocation;
 use App\Models\SiteContent;
-use App\Models\Slot;
-use App\Models\User;
 use App\Support\HomepageContent;
 use Illuminate\Support\Facades\Route;
-use Illuminate\Support\Facades\Schema;
 
 Route::get('/', function () {
     return view('welcome', HomepageContent::payload());
@@ -133,13 +130,13 @@ HTML;
 Route::middleware(['auth', 'admin'])->group(function () {
     Route::get('/admin/dashboard', [AdminController::class, 'index'])->name('admin.dashboard');
 
-    Route::get('/admin/bookings', [\App\Http\Controllers\AdminBookingController::class, 'index'])
+    Route::get('/admin/bookings', [AdminBookingController::class, 'index'])
         ->name('admin.bookings.index');
 
-    Route::post('/admin/bookings/manual', [\App\Http\Controllers\AdminBookingController::class, 'storeManual'])
+    Route::post('/admin/bookings/manual', [AdminBookingController::class, 'storeManual'])
         ->name('admin.bookings.manual');
 
-    Route::post('/admin/bookings/{id}/status', [\App\Http\Controllers\AdminBookingController::class, 'updateStatus'])
+    Route::post('/admin/bookings/{id}/status', [AdminBookingController::class, 'updateStatus'])
         ->name('admin.bookings.status');
 
     Route::get('/admin/users-calendar', [AdminUserCalendarController::class, 'index'])
@@ -166,6 +163,7 @@ Route::middleware(['auth', 'admin'])->group(function () {
     Route::post('/admin/notifications/read', [AdminNotificationController::class, 'markRead'])->name('admin.notifications.read');
 
     Route::get('/admin/activity', [AdminActivityLogController::class, 'index'])->name('admin.activity.index');
+    Route::get('/admin/activity/users/{user}', [AdminActivityLogController::class, 'show'])->name('admin.activity.users.show');
 
     Route::get('/admin/slots', [AdminSlotSettingsController::class, 'index'])->name('admin.slots.index');
     Route::patch('/admin/locations/{location}', [AdminSlotSettingsController::class, 'updateLocation'])
@@ -193,4 +191,4 @@ Route::middleware(['auth', 'admin'])->group(function () {
     Route::patch('/admin/content', [AdminSiteContentController::class, 'update'])->name('admin.content.update');
 });
 
-require __DIR__ . '/auth.php';
+require __DIR__.'/auth.php';

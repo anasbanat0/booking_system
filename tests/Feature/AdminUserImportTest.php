@@ -155,6 +155,50 @@ class AdminUserImportTest extends TestCase
         Queue::assertPushed(SendPasswordSetupLink::class, fn ($job) => $job->sendAccountCreatedMessage);
     }
 
+    public function test_csv_import_does_not_drop_new_emails_when_phone_values_are_duplicated_or_scientific(): void
+    {
+        Queue::fake();
+
+        $admin = User::factory()->create(['role' => 'admin']);
+        $location = BookingLocation::query()->firstOrFail();
+        User::factory()->create(['phone' => '+972599999999']);
+        $rows = [
+            [
+                'name' => 'Duplicate Phone Student',
+                'email' => 'duplicate-phone@example.com',
+                'phone' => '+972599999999',
+                'role' => 'student',
+                'branch' => $location->name,
+                'password' => '',
+            ],
+            [
+                'name' => 'Scientific Phone Student',
+                'email' => 'scientific-phone@example.com',
+                'phone' => '9.73E+11',
+                'role' => 'student',
+                'branch' => $location->name,
+                'password' => '',
+            ],
+        ];
+
+        (new ImportUsersCsvChunk(
+            $rows,
+            [strtolower($location->name) => $location->id],
+            $admin->id,
+            true,
+            null,
+        ))->handle();
+
+        $this->assertDatabaseHas('users', [
+            'email' => 'duplicate-phone@example.com',
+            'phone' => null,
+        ]);
+        $this->assertDatabaseHas('users', [
+            'email' => 'scientific-phone@example.com',
+            'phone' => null,
+        ]);
+    }
+
     public function test_csv_with_duplicate_headers_returns_a_visible_validation_error(): void
     {
         Queue::fake();

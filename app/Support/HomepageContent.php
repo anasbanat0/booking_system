@@ -5,7 +5,6 @@ namespace App\Support;
 use App\Models\Booking;
 use App\Models\BookingLocation;
 use App\Models\SiteContent;
-use App\Models\Slot;
 use App\Models\User;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Schema;
@@ -18,6 +17,9 @@ class HomepageContent
         $hasBookings = Schema::hasTable('bookings');
         $hasSlots = Schema::hasTable('slots');
         $hasLocations = Schema::hasTable('booking_locations');
+        $activeLocations = $hasLocations
+            ? BookingLocation::where('is_active', true)->orderBy('name')->get()
+            : collect();
 
         $content = [
             'page_title' => self::value('page_title', 'Medical Hub - Samir Foundation', $location),
@@ -92,17 +94,46 @@ class HomepageContent
                 'students' => $studentQuery?->count() ?? 0,
                 'bookings' => $legacyBookings + $newBookings,
                 'studyHours' => ($legacyBookings * 3) + $newStudyHours,
-                'branches' => $location ? 1 : ($hasLocations ? BookingLocation::where('is_active', true)->count() : 0),
+                'branches' => $location ? 1 : $activeLocations->count(),
             ],
-            'locations' => $hasLocations ? BookingLocation::where('is_active', true)->orderBy('name')->get() : collect(),
+            'locations' => $activeLocations,
+            'registrationLinks' => $activeLocations
+                ->when($location, fn ($locations) => $locations->where('id', $location->id))
+                ->map(fn (BookingLocation $registrationLocation) => [
+                    'location' => $registrationLocation,
+                    'label' => self::registrationLabel($registrationLocation),
+                    'url' => self::value(
+                        'registration_url',
+                        self::defaultRegistrationUrl($registrationLocation),
+                        $registrationLocation
+                    ),
+                ])
+                ->filter(fn (array $link) => $link['url'] !== '')
+                ->values(),
             'selectedLocation' => $location,
         ];
+    }
+
+    private static function defaultRegistrationUrl(BookingLocation $location): string
+    {
+        return match ($location->slug) {
+            'gaza' => 'https://forms.gle/GgCcdxxgnzUMq8917',
+            'khan-younis' => 'https://forms.gle/SkBLXMDVkS8uNqyy7',
+            default => '',
+        };
+    }
+
+    private static function registrationLabel(BookingLocation $location): string
+    {
+        $label = self::value('registration_button_label', 'Register', $location);
+
+        return $label === 'Register for '.$location->name.' Hub' ? 'Register' : $label;
     }
 
     private static function value(string $key, string $fallback, ?BookingLocation $location): string
     {
         if ($location) {
-            $locationValue = SiteContent::getValue('hub_' . $location->id . '_' . $key, '');
+            $locationValue = SiteContent::getValue('hub_'.$location->id.'_'.$key, '');
 
             if ($locationValue !== '') {
                 return $locationValue;
@@ -118,7 +149,7 @@ class HomepageContent
             return self::legacyBookingsForLocation($location);
         }
 
-        if (!$hasLocations) {
+        if (! $hasLocations) {
             return 15900;
         }
 
@@ -129,7 +160,7 @@ class HomepageContent
 
     private static function legacyBookingsForLocation(BookingLocation $location): int
     {
-        $configured = SiteContent::getValue('hub_' . $location->id . '_legacy_bookings', '');
+        $configured = SiteContent::getValue('hub_'.$location->id.'_legacy_bookings', '');
 
         if (is_numeric($configured)) {
             return max((int) $configured, 0);
@@ -155,7 +186,7 @@ class HomepageContent
             ->when($location, fn ($query) => $query->whereHas('slot', fn ($slotQuery) => $slotQuery->where('booking_location_id', $location->id)))
             ->get()
             ->sum(function (Booking $booking) {
-                if (!$booking->slot?->start_time || !$booking->slot?->end_time) {
+                if (! $booking->slot?->start_time || ! $booking->slot?->end_time) {
                     return 0;
                 }
 

@@ -2,8 +2,8 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\SiteContent;
 use App\Models\BookingLocation;
+use App\Models\SiteContent;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 
@@ -44,7 +44,7 @@ class AdminSiteContentController extends Controller
     {
         abort_unless($request->user()->canManageAllBranches(), 403);
 
-        $validated = $request->validate([
+        $rules = [
             'content' => ['required', 'array'],
             'content.*' => ['nullable', 'string'],
             'site_logo_file' => ['nullable', 'image', 'max:4096'],
@@ -65,10 +65,17 @@ class AdminSiteContentController extends Controller
             'remove_hero_background_gallery' => ['nullable', 'array'],
             'remove_event_gallery' => ['nullable', 'array'],
             'remove_hub_supporter_gallery' => ['nullable', 'array'],
-        ]);
+        ];
+
+        foreach (BookingLocation::query()->pluck('id') as $locationId) {
+            $rules['content.hub_'.$locationId.'_registration_button_label'] = ['nullable', 'string', 'max:100'];
+            $rules['content.hub_'.$locationId.'_registration_url'] = ['nullable', 'url:http,https', 'max:2048'];
+        }
+
+        $validated = $request->validate($rules);
 
         foreach ($validated['content'] as $key => $value) {
-            if (!$this->canUpdateKey($request, $key)) {
+            if (! $this->canUpdateKey($request, $key)) {
                 continue;
             }
 
@@ -83,7 +90,7 @@ class AdminSiteContentController extends Controller
         }
 
         foreach ($locations = BookingLocation::orderBy('name')->get() as $location) {
-            $key = 'hub_' . $location->id . '_logo_url';
+            $key = 'hub_'.$location->id.'_logo_url';
 
             if ($this->canUpdateKey($request, $key)) {
                 $this->syncHubLogo($request, $location->id);
@@ -119,21 +126,21 @@ class AdminSiteContentController extends Controller
         }
 
         foreach ($request->file('hub_supporter_gallery_files', []) as $locationId => $files) {
-            $key = 'hub_' . $locationId . '_supporter_gallery';
+            $key = 'hub_'.$locationId.'_supporter_gallery';
 
             if ($this->canUpdateKey($request, $key)) {
                 $this->syncGallery(
                     $key,
                     $files,
-                    $request->input('remove_hub_supporter_gallery.' . $locationId, [])
+                    $request->input('remove_hub_supporter_gallery.'.$locationId, [])
                 );
             }
         }
 
         foreach ($request->input('remove_hub_supporter_gallery', []) as $locationId => $removeIndexes) {
-            $key = 'hub_' . $locationId . '_supporter_gallery';
+            $key = 'hub_'.$locationId.'_supporter_gallery';
 
-            if (!$request->hasFile('hub_supporter_gallery_files.' . $locationId) && $this->canUpdateKey($request, $key)) {
+            if (! $request->hasFile('hub_supporter_gallery_files.'.$locationId) && $this->canUpdateKey($request, $key)) {
                 $this->syncGallery($key, [], $removeIndexes);
             }
         }
@@ -154,7 +161,7 @@ class AdminSiteContentController extends Controller
 
         $file = $request->file('site_logo_file');
 
-        if (!$file) {
+        if (! $file) {
             return;
         }
 
@@ -163,7 +170,7 @@ class AdminSiteContentController extends Controller
         $path = $file->store('site', 'public');
 
         SiteContent::updateOrCreate(['key' => 'site_logo_path'], ['value' => $path]);
-        SiteContent::updateOrCreate(['key' => 'site_logo_url'], ['value' => '/storage/' . ltrim($path, '/')]);
+        SiteContent::updateOrCreate(['key' => 'site_logo_url'], ['value' => '/storage/'.ltrim($path, '/')]);
     }
 
     private function deleteCurrentLogo(): void
@@ -177,10 +184,10 @@ class AdminSiteContentController extends Controller
 
     private function syncHubLogo(Request $request, int $locationId): void
     {
-        $urlKey = 'hub_' . $locationId . '_logo_url';
-        $pathKey = 'hub_' . $locationId . '_logo_path';
+        $urlKey = 'hub_'.$locationId.'_logo_url';
+        $pathKey = 'hub_'.$locationId.'_logo_path';
 
-        if ((bool) $request->input('remove_hub_logo.' . $locationId)) {
+        if ((bool) $request->input('remove_hub_logo.'.$locationId)) {
             $this->deleteLogoPath($pathKey);
 
             SiteContent::updateOrCreate(['key' => $urlKey], ['value' => '']);
@@ -189,9 +196,9 @@ class AdminSiteContentController extends Controller
             return;
         }
 
-        $file = $request->file('hub_logo_files.' . $locationId);
+        $file = $request->file('hub_logo_files.'.$locationId);
 
-        if (!$file) {
+        if (! $file) {
             return;
         }
 
@@ -200,7 +207,7 @@ class AdminSiteContentController extends Controller
         $path = $file->store('hub-logos', 'public');
 
         SiteContent::updateOrCreate(['key' => $pathKey], ['value' => $path]);
-        SiteContent::updateOrCreate(['key' => $urlKey], ['value' => '/storage/' . ltrim($path, '/')]);
+        SiteContent::updateOrCreate(['key' => $urlKey], ['value' => '/storage/'.ltrim($path, '/')]);
     }
 
     private function deleteLogoPath(string $pathKey): void
@@ -218,7 +225,7 @@ class AdminSiteContentController extends Controller
             return true;
         }
 
-        return str_starts_with($key, 'hub_' . $request->user()->booking_location_id . '_');
+        return str_starts_with($key, 'hub_'.$request->user()->booking_location_id.'_');
     }
 
     private function syncGallery(string $key, array $files, array $removeIndexes, array $titleUpdates = [], string $directory = 'supporters'): void
@@ -245,7 +252,7 @@ class AdminSiteContentController extends Controller
         }
 
         foreach ($files as $file) {
-            if (!$file) {
+            if (! $file) {
                 continue;
             }
 
@@ -254,7 +261,7 @@ class AdminSiteContentController extends Controller
             $gallery[] = [
                 'name' => pathinfo($file->getClientOriginalName(), PATHINFO_FILENAME),
                 'path' => $path,
-                'url' => '/storage/' . ltrim($path, '/'),
+                'url' => '/storage/'.ltrim($path, '/'),
             ];
         }
 
