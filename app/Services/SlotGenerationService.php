@@ -6,6 +6,7 @@ use App\Models\ClosedPeriod;
 use App\Models\Holiday;
 use App\Models\Slot;
 use App\Models\SlotTemplate;
+use App\Support\BookingPeriod;
 use Carbon\Carbon;
 
 class SlotGenerationService
@@ -13,7 +14,7 @@ class SlotGenerationService
     public function generateUpcomingPeriod(?Carbon $now = null): array
     {
         $now ??= now();
-        [$currentStart, $currentEnd] = $this->monthPeriodRange($now);
+        [$currentStart, $currentEnd] = BookingPeriod::range($now);
         $opensAt = $currentEnd->copy()->subHours(48);
 
         if ($now->lt($opensAt)) {
@@ -27,7 +28,8 @@ class SlotGenerationService
             ];
         }
 
-        [$nextStart, $nextEnd] = $this->nextPeriodRange($currentStart);
+        $nextStart = BookingPeriod::nextStart($currentStart);
+        [$nextStart, $nextEnd] = BookingPeriod::range($nextStart);
 
         return $this->generateRange($nextStart, $nextEnd);
     }
@@ -62,6 +64,7 @@ class SlotGenerationService
             if ($date->isFriday()) {
                 $skipped++;
                 $date->addDay();
+
                 continue;
             }
 
@@ -120,39 +123,5 @@ class SlotGenerationService
             ->whereTime('start_time', '<', $template->end_time)
             ->whereTime('end_time', '>', $template->start_time)
             ->exists();
-    }
-
-    private function monthPeriodRange(Carbon $date): array
-    {
-        $startDay = match (true) {
-            $date->day <= 7 => 1,
-            $date->day <= 14 => 8,
-            $date->day <= 21 => 15,
-            default => 22,
-        };
-
-        $endDay = match ($startDay) {
-            1 => 7,
-            8 => 14,
-            15 => 21,
-            default => $date->copy()->endOfMonth()->day,
-        };
-
-        return [
-            $date->copy()->startOfMonth()->day($startDay)->startOfDay(),
-            $date->copy()->startOfMonth()->day($endDay)->endOfDay(),
-        ];
-    }
-
-    private function nextPeriodRange(Carbon $periodStart): array
-    {
-        $nextStart = match ($periodStart->day) {
-            1 => $periodStart->copy()->day(8),
-            8 => $periodStart->copy()->day(15),
-            15 => $periodStart->copy()->day(22),
-            default => $periodStart->copy()->addMonthNoOverflow()->startOfMonth(),
-        };
-
-        return $this->monthPeriodRange($nextStart);
     }
 }

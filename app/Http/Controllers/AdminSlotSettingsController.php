@@ -21,14 +21,14 @@ class AdminSlotSettingsController extends Controller
             ? $locations
             : $locations->where('id', request()->user()->booking_location_id)->values();
         $holidays = Holiday::with('location')
-            ->when(!request()->user()->canManageAllBranches(), function ($query) {
+            ->when(! request()->user()->canManageAllBranches(), function ($query) {
                 $query->where('booking_location_id', request()->user()->booking_location_id);
             })
             ->whereDate('date', '>=', now()->subDays(7)->toDateString())
             ->orderBy('date')
             ->get();
         $closedPeriods = ClosedPeriod::with('location')
-            ->when(!request()->user()->canManageAllBranches(), function ($query) {
+            ->when(! request()->user()->canManageAllBranches(), function ($query) {
                 $query->where('booking_location_id', request()->user()->booking_location_id);
             })
             ->whereDate('date', '>=', now()->subDays(7)->toDateString())
@@ -38,7 +38,7 @@ class AdminSlotSettingsController extends Controller
         $closurePeriods = SlotTemplate::query()
             ->select('start_time', 'end_time')
             ->distinct()
-            ->when(!request()->user()->canManageAllBranches(), function ($query) {
+            ->when(! request()->user()->canManageAllBranches(), function ($query) {
                 $query->where('booking_location_id', request()->user()->booking_location_id);
             })
             ->orderBy('start_time')
@@ -62,7 +62,6 @@ class AdminSlotSettingsController extends Controller
 
         $validated = $request->validate([
             'weekly_limit' => ['required', 'integer', 'min:1', 'max:100'],
-            'monthly_limit' => ['required', 'integer', 'min:1', 'max:500'],
             'reschedule_cutoff_hours' => ['required', 'integer', 'min:1', 'max:168'],
             'reminder_hours_before' => ['required', 'integer', 'min:1', 'max:168'],
             'advance_booking_days' => ['required', 'integer', 'min:0', 'max:7'],
@@ -72,7 +71,6 @@ class AdminSlotSettingsController extends Controller
 
         BookingRule::current()->update([
             'weekly_limit' => $validated['weekly_limit'],
-            'monthly_limit' => $validated['monthly_limit'],
             'reschedule_cutoff_hours' => $validated['reschedule_cutoff_hours'],
             'reminder_hours_before' => $validated['reminder_hours_before'],
             'advance_booking_days' => $validated['advance_booking_days'],
@@ -88,7 +86,7 @@ class AdminSlotSettingsController extends Controller
         $this->authorizeBranchAccess($request, $location->id);
 
         $validated = $request->validate([
-            'name' => ['required', 'string', 'max:255', 'unique:booking_locations,name,' . $location->id],
+            'name' => ['required', 'string', 'max:255', 'unique:booking_locations,name,'.$location->id],
             'default_capacity' => ['required', 'integer', 'min:1', 'max:500'],
             'is_active' => ['nullable', 'boolean'],
         ]);
@@ -205,7 +203,7 @@ class AdminSlotSettingsController extends Controller
 
     public function updateHoliday(Request $request, Holiday $holiday)
     {
-        if (!$request->user()->canManageAllBranches()) {
+        if (! $request->user()->canManageAllBranches()) {
             abort_unless((int) $holiday->booking_location_id === (int) $request->user()->booking_location_id, 403);
         }
 
@@ -230,7 +228,7 @@ class AdminSlotSettingsController extends Controller
 
     public function destroyHoliday(Request $request, Holiday $holiday)
     {
-        if (!$request->user()->canManageAllBranches()) {
+        if (! $request->user()->canManageAllBranches()) {
             abort_unless((int) $holiday->booking_location_id === (int) $request->user()->booking_location_id, 403);
         }
 
@@ -256,7 +254,7 @@ class AdminSlotSettingsController extends Controller
         foreach ($validated['periods'] as $period) {
             [$startTime, $endTime] = array_pad(explode('|', $period, 2), 2, null);
 
-            if (!$startTime || !$endTime) {
+            if (! $startTime || ! $endTime) {
                 continue;
             }
 
@@ -280,7 +278,7 @@ class AdminSlotSettingsController extends Controller
 
     public function destroyClosedPeriod(Request $request, ClosedPeriod $closedPeriod)
     {
-        if (!$request->user()->canManageAllBranches()) {
+        if (! $request->user()->canManageAllBranches()) {
             abort_unless((int) $closedPeriod->booking_location_id === (int) $request->user()->booking_location_id, 403);
         }
 
@@ -340,7 +338,7 @@ class AdminSlotSettingsController extends Controller
                     ->whereTime('end_time', '>', $slot->start_time)
                     ->exists();
 
-                if (!$hasHoliday && !$hasClosedPeriod) {
+                if (! $hasHoliday && ! $hasClosedPeriod) {
                     $slot->update(['is_active' => true]);
                 }
             });

@@ -43,12 +43,12 @@
             <div class="rounded-lg border border-stone-200 bg-white p-4 shadow-sm">
                 <p class="text-xs font-extrabold uppercase tracking-wide text-stone-500">Weekly remaining</p>
                 <p class="mt-2 text-3xl font-extrabold text-stone-950">{{ $remaining['weekly'] }}</p>
-                <p class="mt-1 text-xs text-stone-500">of {{ $remaining['weeklyLimit'] }} weekly bookings</p>
+                <p class="mt-1 text-xs text-stone-500">of {{ $remaining['weeklyLimit'] }} for {{ $remaining['weeklyPeriodLabel'] }}</p>
             </div>
             <div class="rounded-lg border border-stone-200 bg-white p-4 shadow-sm">
-                <p class="text-xs font-extrabold uppercase tracking-wide text-stone-500">Monthly remaining</p>
-                <p class="mt-2 text-3xl font-extrabold text-stone-950">{{ $remaining['monthly'] }}</p>
-                <p class="mt-1 text-xs text-stone-500">of {{ $remaining['monthlyLimit'] }} monthly bookings</p>
+                <p class="text-xs font-extrabold uppercase tracking-wide text-stone-500">Bookings in {{ $remaining['monthLabel'] }}</p>
+                <p class="mt-2 text-3xl font-extrabold text-stone-950">{{ $remaining['monthlyUsed'] }}</p>
+                <p class="mt-1 text-xs text-stone-500">Up to {{ $remaining['monthlyCapacity'] }} across {{ $remaining['monthlyPeriodCount'] }} weekly periods</p>
             </div>
             <div class="rounded-lg border border-stone-200 bg-white p-4 shadow-sm">
                 <p class="text-xs font-extrabold uppercase tracking-wide text-stone-500">Warning status</p>

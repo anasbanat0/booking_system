@@ -35,12 +35,6 @@
                     </label>
 
                     <label class="block">
-                        <span class="text-sm font-medium text-slate-700">Monthly limit</span>
-                        <input type="number" name="monthly_limit" min="1" max="500" value="{{ old('monthly_limit', $bookingRules->monthly_limit) }}"
-                               class="mt-1 block w-full rounded-md border-slate-300 text-sm shadow-sm focus:border-blue-500 focus:ring-blue-500">
-                    </label>
-
-                    <label class="block">
                         <span class="text-sm font-medium text-slate-700">Reschedule cutoff hours</span>
                         <input type="number" name="reschedule_cutoff_hours" min="1" max="168" value="{{ old('reschedule_cutoff_hours', $bookingRules->reschedule_cutoff_hours) }}"
                                class="mt-1 block w-full rounded-md border-slate-300 text-sm shadow-sm focus:border-blue-500 focus:ring-blue-500">

@@ -2,12 +2,14 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\Booking;
 use App\Models\ActivityLog;
 use App\Models\AdminNotification;
+use App\Models\Booking;
 use App\Models\BookingRule;
+use App\Models\Holiday;
 use App\Models\Slot;
 use App\Services\WhatsAppService;
+use App\Support\BookingPeriod;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -19,8 +21,10 @@ use PDOException;
 class BookingController extends Controller
 {
     private array $activeStatuses = ['booked', 'rescheduled'];
+
     private array $weeklyQuotaStatuses = ['booked', 'rescheduled', 'completed'];
-    private array $monthlyQuotaStatuses = ['booked', 'rescheduled', 'completed', 'cancelled'];
+
+    private array $monthlyTrackingStatuses = ['booked', 'rescheduled', 'completed', 'cancelled', 'no_show'];
 
     public function store(Request $request)
     {
@@ -45,10 +49,10 @@ class BookingController extends Controller
             ]);
 
             $slot->increment('booked_count');
-            $this->notifyAdmins($booking, 'booking_created', 'New booking', $user->name . ' booked ' . $slot->date . ' from ' . $slot->start_time . ' to ' . $slot->end_time . '.');
-            $email = $this->emailPayload($booking, 'Booking confirmed', 'Your booking is confirmed for ' . $slot->date . ' from ' . $slot->start_time . ' to ' . $slot->end_time . '.');
+            $this->notifyAdmins($booking, 'booking_created', 'New booking', $user->name.' booked '.$slot->date.' from '.$slot->start_time.' to '.$slot->end_time.'.');
+            $email = $this->emailPayload($booking, 'Booking confirmed', 'Your booking is confirmed for '.$slot->date.' from '.$slot->start_time.' to '.$slot->end_time.'.');
             $whatsapp = ['type' => 'booking_confirmed', 'booking_id' => $booking->id];
-            ActivityLog::record('booking_created', 'Booking created', $user->name . ' created a booking.', [
+            ActivityLog::record('booking_created', 'Booking created', $user->name.' created a booking.', [
                 'user_id' => $user->id,
                 'booking_id' => $booking->id,
                 'properties' => ['slot_id' => $slot->id],
@@ -77,19 +81,19 @@ class BookingController extends Controller
         $response = $this->transactionWithReconnect(function () use ($request, $booking, &$email, &$whatsapp) {
             $booking = Booking::with('slot')->lockForUpdate()->findOrFail($booking->id);
 
-            if (!in_array($booking->status, $this->activeStatuses, true)) {
+            if (! in_array($booking->status, $this->activeStatuses, true)) {
                 return back()->with('error', 'This booking cannot be rescheduled.');
             }
 
-            if (!$booking->slot) {
+            if (! $booking->slot) {
                 return back()->with('error', 'This booking is linked to an unavailable slot. Please contact support.');
             }
 
-            $currentSlotDateTime = Carbon::parse($booking->slot->date . ' ' . $booking->slot->start_time);
+            $currentSlotDateTime = Carbon::parse($booking->slot->date.' '.$booking->slot->start_time);
             $bookingRules = BookingRule::current();
 
             if (now()->diffInHours($currentSlotDateTime, false) < $bookingRules->reschedule_cutoff_hours) {
-                return back()->with('error', 'Rescheduling is allowed at least ' . $bookingRules->reschedule_cutoff_hours . ' hours before the booking.');
+                return back()->with('error', 'Rescheduling is allowed at least '.$bookingRules->reschedule_cutoff_hours.' hours before the booking.');
             }
 
             $newSlot = Slot::lockForUpdate()->findOrFail($request->slot_id);
@@ -102,6 +106,7 @@ class BookingController extends Controller
             $this->validateSlotBranch($newSlot);
             $this->validateSlotAvailability($newSlot);
             $this->validateDuplicateRules($booking->user_id, $newSlot, $booking->id);
+            $this->validateBookingLimits($booking->user_id, $newSlot, $booking->id, false);
 
             if ($booking->slot && $booking->slot->booked_count > 0) {
                 $booking->slot->decrement('booked_count');
@@ -115,10 +120,10 @@ class BookingController extends Controller
                 'rescheduled_at' => now(),
                 'reminder_sent_at' => null,
             ]);
-            $this->notifyAdmins($booking, 'booking_rescheduled', 'Booking rescheduled', $booking->user->name . ' rescheduled to ' . $newSlot->date . ' from ' . $newSlot->start_time . ' to ' . $newSlot->end_time . '.');
-            $email = $this->emailPayload($booking, 'Booking rescheduled', 'Your booking was rescheduled to ' . $newSlot->date . ' from ' . $newSlot->start_time . ' to ' . $newSlot->end_time . '.');
+            $this->notifyAdmins($booking, 'booking_rescheduled', 'Booking rescheduled', $booking->user->name.' rescheduled to '.$newSlot->date.' from '.$newSlot->start_time.' to '.$newSlot->end_time.'.');
+            $email = $this->emailPayload($booking, 'Booking rescheduled', 'Your booking was rescheduled to '.$newSlot->date.' from '.$newSlot->start_time.' to '.$newSlot->end_time.'.');
             $whatsapp = ['type' => 'booking_rescheduled', 'booking_id' => $booking->id];
-            ActivityLog::record('booking_rescheduled', 'Booking rescheduled', $booking->user->name . ' rescheduled a booking.', [
+            ActivityLog::record('booking_rescheduled', 'Booking rescheduled', $booking->user->name.' rescheduled a booking.', [
                 'user_id' => $booking->user_id,
                 'booking_id' => $booking->id,
                 'properties' => ['slot_id' => $newSlot->id],
@@ -143,7 +148,7 @@ class BookingController extends Controller
         $response = $this->transactionWithReconnect(function () use ($booking, &$email, &$whatsapp) {
             $booking = Booking::with('slot', 'user')->lockForUpdate()->findOrFail($booking->id);
 
-            if (!in_array($booking->status, $this->activeStatuses, true)) {
+            if (! in_array($booking->status, $this->activeStatuses, true)) {
                 return back()->with('error', 'This booking cannot be cancelled.');
             }
 
@@ -158,10 +163,10 @@ class BookingController extends Controller
 
             $this->refreshUserWarning($booking->user);
             $bookingDate = $booking->slot?->date ?? 'an unavailable slot';
-            $this->notifyAdmins($booking, 'booking_cancelled', 'Booking cancelled', $booking->user->name . ' cancelled a booking on ' . $bookingDate . '.');
-            $email = $this->emailPayload($booking, 'Booking cancelled', 'Your booking on ' . $bookingDate . ' has been cancelled.');
+            $this->notifyAdmins($booking, 'booking_cancelled', 'Booking cancelled', $booking->user->name.' cancelled a booking on '.$bookingDate.'.');
+            $email = $this->emailPayload($booking, 'Booking cancelled', 'Your booking on '.$bookingDate.' has been cancelled.');
             $whatsapp = ['type' => 'booking_cancelled', 'booking_id' => $booking->id];
-            ActivityLog::record('booking_cancelled', 'Booking cancelled', $booking->user->name . ' cancelled a booking.', [
+            ActivityLog::record('booking_cancelled', 'Booking cancelled', $booking->user->name.' cancelled a booking.', [
                 'user_id' => $booking->user_id,
                 'booking_id' => $booking->id,
             ]);
@@ -234,9 +239,8 @@ class BookingController extends Controller
             ->get();
 
         $bookingRules = BookingRule::current();
-        [$weekStart, $weekEnd] = $this->monthWeekRange(now());
+        [$weekStart, $weekEnd] = BookingPeriod::range(now());
         [$monthStart, $monthEnd] = [now()->copy()->startOfMonth(), now()->copy()->endOfMonth()];
-        $monthlyLimit = $this->effectiveMonthlyLimit($request->user(), $bookingRules);
 
         $weeklyUsed = Booking::where('user_id', $request->user()->id)
             ->whereIn('status', $this->weeklyQuotaStatuses)
@@ -248,7 +252,7 @@ class BookingController extends Controller
             })
             ->count();
         $monthlyUsed = Booking::where('user_id', $request->user()->id)
-            ->whereIn('status', $this->monthlyQuotaStatuses)
+            ->whereIn('status', $this->monthlyTrackingStatuses)
             ->whereHas('slot', function ($query) use ($monthStart, $monthEnd) {
                 $query->whereBetween('date', [
                     $monthStart->toDateString(),
@@ -258,9 +262,12 @@ class BookingController extends Controller
             ->count();
         $remaining = [
             'weekly' => max($bookingRules->weekly_limit - $weeklyUsed, 0),
-            'monthly' => max($monthlyLimit - $monthlyUsed, 0),
             'weeklyLimit' => $bookingRules->weekly_limit,
-            'monthlyLimit' => $monthlyLimit,
+            'weeklyPeriodLabel' => $weekStart->format('M d').' - '.$weekEnd->format('M d'),
+            'monthlyUsed' => $monthlyUsed,
+            'monthlyCapacity' => $this->monthlyBookingCapacity($request->user(), $bookingRules, now()),
+            'monthlyPeriodCount' => count(BookingPeriod::forMonth(now())),
+            'monthLabel' => now()->format('F Y'),
             'rescheduleCutoffHours' => $bookingRules->reschedule_cutoff_hours,
         ];
 
@@ -287,7 +294,7 @@ class BookingController extends Controller
 
     private function validateSlotIsFuture(Slot $slot): void
     {
-        $startsAt = Carbon::parse($slot->date . ' ' . $slot->start_time);
+        $startsAt = Carbon::parse($slot->date.' '.$slot->start_time);
 
         if ($startsAt->lessThanOrEqualTo(now())) {
             throw ValidationException::withMessages([
@@ -309,7 +316,7 @@ class BookingController extends Controller
 
     private function validateSlotAvailability(Slot $slot): void
     {
-        if (!$slot->is_active) {
+        if (! $slot->is_active) {
             throw ValidationException::withMessages([
                 'slot' => 'This slot is not available.',
             ]);
@@ -393,96 +400,86 @@ class BookingController extends Controller
         }
     }
 
-    private function validateBookingLimits(int $userId, Slot $slot): void
-    {
+    private function validateBookingLimits(
+        int $userId,
+        Slot $slot,
+        ?int $ignoreBookingId = null,
+        bool $requireOpenPeriod = true
+    ): void {
         $bookingRules = BookingRule::current();
         $slotDate = Carbon::parse($slot->date);
-        [$weekStart, $weekEnd] = $this->monthWeekRange($slotDate);
-        $monthlyLimit = $this->effectiveMonthlyLimit(request()->user(), $bookingRules, $slotDate);
+        [$weekStart, $weekEnd] = BookingPeriod::range($slotDate);
 
-        if (!$this->slotIsInsideOpenBookingPeriod($slotDate, $bookingRules)) {
+        if ($requireOpenPeriod && ! $this->slotIsInsideOpenBookingPeriod($slotDate, $bookingRules)) {
             throw ValidationException::withMessages([
                 'limit' => 'Booking is not open for this weekly period yet.',
             ]);
         }
 
-        $weeklyCount = Booking::where('user_id', $userId)
+        $weeklyBookings = Booking::where('user_id', $userId)
             ->whereIn('status', $this->weeklyQuotaStatuses)
             ->whereHas('slot', function ($query) use ($weekStart, $weekEnd) {
                 $query->whereBetween('date', [
                     $weekStart->toDateString(),
                     $weekEnd->toDateString(),
                 ]);
-            })
-            ->count();
+            });
+
+        if ($ignoreBookingId) {
+            $weeklyBookings->whereKeyNot($ignoreBookingId);
+        }
+
+        $weeklyCount = $weeklyBookings->count();
 
         if ($weeklyCount >= $bookingRules->weekly_limit) {
             throw ValidationException::withMessages([
-                'limit' => 'Weekly limit reached for this month period (' . $bookingRules->weekly_limit . ' bookings).',
+                'limit' => 'Weekly limit reached for this period ('.$bookingRules->weekly_limit.' bookings).',
             ]);
         }
+    }
 
-        $monthlyCount = Booking::where('user_id', $userId)
-            ->whereIn('status', $this->monthlyQuotaStatuses)
-            ->whereHas('slot', function ($query) use ($slotDate) {
-                $query->whereBetween('date', [
-                    $slotDate->copy()->startOfMonth()->toDateString(),
-                    $slotDate->copy()->endOfMonth()->toDateString(),
-                ]);
+    private function monthlyBookingCapacity($user, BookingRule $bookingRules, Carbon $month): int
+    {
+        $holidayDates = Holiday::query()
+            ->whereBetween('date', [
+                $month->copy()->startOfMonth()->toDateString(),
+                $month->copy()->endOfMonth()->toDateString(),
+            ])
+            ->where(function ($query) use ($user) {
+                $query->whereNull('booking_location_id');
+
+                if ($user->booking_location_id) {
+                    $query->orWhere('booking_location_id', $user->booking_location_id);
+                }
             })
-            ->count();
+            ->pluck('date')
+            ->map(fn ($date) => Carbon::parse($date)->toDateString())
+            ->all();
 
-        if ($monthlyCount >= $monthlyLimit) {
-            throw ValidationException::withMessages([
-                'limit' => 'Monthly limit reached (' . $monthlyLimit . ' bookings).',
-            ]);
-        }
-    }
+        return collect(BookingPeriod::forMonth($month))->sum(function (array $period) use ($bookingRules, $holidayDates) {
+            if (! $bookingRules->enforce_one_booking_per_day) {
+                return $bookingRules->weekly_limit;
+            }
 
-    private function monthWeekRange(Carbon $date): array
-    {
-        $day = $date->day;
-        $startDay = match (true) {
-            $day <= 7 => 1,
-            $day <= 14 => 8,
-            $day <= 21 => 15,
-            default => 22,
-        };
-        $endDay = match ($startDay) {
-            1 => 7,
-            8 => 14,
-            15 => 21,
-            default => $date->copy()->endOfMonth()->day,
-        };
+            [$start, $end] = $period;
+            $bookableDays = 0;
+            $cursor = $start->copy();
 
-        return [
-            $date->copy()->startOfMonth()->day($startDay)->startOfDay(),
-            $date->copy()->startOfMonth()->day($endDay)->endOfDay(),
-        ];
-    }
+            while ($cursor->lte($end)) {
+                if (! $cursor->isFriday() && ! in_array($cursor->toDateString(), $holidayDates, true)) {
+                    $bookableDays++;
+                }
 
-    private function effectiveMonthlyLimit($user, BookingRule $bookingRules, ?Carbon $targetDate = null): int
-    {
-        $targetDate ??= now();
-        $createdAt = Carbon::parse($user->created_at);
+                $cursor->addDay();
+            }
 
-        if (!$createdAt->isSameMonth($targetDate)) {
-            return $bookingRules->monthly_limit;
-        }
-
-        $bucketIndex = match (true) {
-            $createdAt->day <= 7 => 0,
-            $createdAt->day <= 14 => 1,
-            $createdAt->day <= 21 => 2,
-            default => 3,
-        };
-
-        return min($bookingRules->monthly_limit, max(0, 4 - $bucketIndex) * $bookingRules->weekly_limit);
+            return min($bookingRules->weekly_limit, $bookableDays);
+        });
     }
 
     private function slotIsInsideOpenBookingPeriod(Carbon $slotDate, BookingRule $bookingRule): bool
     {
-        [$currentStart, $currentEnd] = $this->monthWeekRange(now());
+        [$currentStart, $currentEnd] = BookingPeriod::range(now());
 
         if ($slotDate->betweenIncluded($currentStart, $currentEnd)) {
             return true;
@@ -498,13 +495,8 @@ class BookingController extends Controller
             return false;
         }
 
-        $nextStart = match ($currentStart->day) {
-            1 => $currentStart->copy()->day(8),
-            8 => $currentStart->copy()->day(15),
-            15 => $currentStart->copy()->day(22),
-            default => $currentStart->copy()->addMonthNoOverflow()->startOfMonth(),
-        };
-        [$nextPeriodStart, $nextPeriodEnd] = $this->monthWeekRange($nextStart);
+        $nextStart = BookingPeriod::nextStart($currentStart);
+        [$nextPeriodStart, $nextPeriodEnd] = BookingPeriod::range($nextStart);
 
         return $slotDate->betweenIncluded($nextPeriodStart, $nextPeriodEnd);
     }
@@ -571,7 +563,7 @@ class BookingController extends Controller
     {
         $booking->loadMissing('user');
 
-        if (!$booking->user?->email) {
+        if (! $booking->user?->email) {
             return null;
         }
 
@@ -584,7 +576,7 @@ class BookingController extends Controller
 
     private function sendEmailAfterResponse(?array $email): void
     {
-        if (!$email) {
+        if (! $email) {
             return;
         }
 
@@ -605,7 +597,7 @@ class BookingController extends Controller
 
     private function sendWhatsAppAfterResponse(?array $whatsapp): void
     {
-        if (!$whatsapp) {
+        if (! $whatsapp) {
             return;
         }
 
@@ -613,7 +605,7 @@ class BookingController extends Controller
             try {
                 $booking = Booking::with(['user', 'slot.location'])->find($whatsapp['booking_id']);
 
-                if (!$booking) {
+                if (! $booking) {
                     return;
                 }
 
@@ -646,7 +638,7 @@ class BookingController extends Controller
                 return $callback();
             }, 3);
         } catch (PDOException $exception) {
-            if ($callbackStarted || !$this->isMysqlGoneAway($exception)) {
+            if ($callbackStarted || ! $this->isMysqlGoneAway($exception)) {
                 throw $exception;
             }
 
