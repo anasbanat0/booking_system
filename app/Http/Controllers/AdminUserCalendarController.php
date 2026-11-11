@@ -40,7 +40,17 @@ class AdminUserCalendarController extends Controller
             : $request->user()->booking_location_id;
 
         $slots = Slot::with(['location', 'bookings.user'])
-            ->whereBetween('date', [
+        ->where(function ($query) {
+        $query->whereDate('slots.date', '<', '2026-10-29')
+            ->orWhereExists(function ($templates) {
+                $templates->selectRaw('1')
+                    ->from('slot_templates')
+                    ->whereColumn('slot_templates.booking_location_id', 'slots.booking_location_id')
+                    ->whereColumn('slot_templates.start_time', 'slots.start_time')
+                    ->whereColumn('slot_templates.end_time', 'slots.end_time')
+                    ->where('slot_templates.is_active', true);
+                });
+            })->whereBetween('date', [
                 $days->first()->toDateString(),
                 $days->last()->toDateString(),
             ])
@@ -71,6 +81,7 @@ class AdminUserCalendarController extends Controller
         $periods = range(1, max(3, (int) $slotPeriodMap->max()));
 
         $statusCounts = Booking::selectRaw('status, count(*) as total')
+            ->whereIn('slot_id', $slots->pluck('id'))
             ->whereHas('slot', function ($query) use ($days) {
                 $query->whereBetween('date', [
                     $days->first()->toDateString(),
