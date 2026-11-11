@@ -2,10 +2,10 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\User;
 use App\Models\Booking;
 use App\Models\BookingLocation;
 use App\Models\Slot;
+use App\Models\User;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -84,32 +84,40 @@ class AdminController extends Controller
             DB::raw('slots.date as date'),
             DB::raw('count(*) as total')
         )
-        ->join('slots', 'slots.id', '=', 'bookings.slot_id')
-        ->whereBetween('slots.date', [$startDate->toDateString(), $endDate->toDateString()])
-        ->when($selectedLocationId, function ($query) use ($selectedLocationId) {
-            $query->where('slots.booking_location_id', $selectedLocationId);
-        })
-        ->groupBy('slots.date')
-        ->orderBy('slots.date')
-        ->get();
+            ->join('slots', 'slots.id', '=', 'bookings.slot_id')
+            ->whereBetween('slots.date', [$startDate->toDateString(), $endDate->toDateString()])
+            ->when($selectedLocationId, function ($query) use ($selectedLocationId) {
+                $query->where('slots.booking_location_id', $selectedLocationId);
+            })
+            ->groupBy('slots.date')
+            ->orderBy('slots.date')
+            ->get();
 
         $statusCounts = Booking::select('status', DB::raw('count(*) as total'))
-        ->where($bookingScope)
-        ->groupBy('status')
-        ->get();
+            ->where($bookingScope)
+            ->groupBy('status')
+            ->get();
+
+        $registrationCounts = BookingLocation::query()
+            ->whereIn('slug', ['gaza', 'khan-younis'])
+            ->when($selectedLocationId, fn ($query) => $query->whereKey($selectedLocationId))
+            ->withCount(['hubRegistrations as registrations_count' => fn ($query) => $query->whereBetween('submitted_at', [$startDate, $endDate])])
+            ->orderByRaw("CASE WHEN slug = 'gaza' THEN 0 ELSE 1 END")
+            ->get();
+        $totalRegistrations = $registrationCounts->sum('registrations_count');
 
         $peakHours = Booking::select(
             DB::raw('HOUR(slots.start_time) as hour'),
             DB::raw('count(*) as total')
         )
-        ->join('slots', 'slots.id', '=', 'bookings.slot_id')
-        ->whereBetween('slots.date', [$startDate->toDateString(), $endDate->toDateString()])
-        ->when($selectedLocationId, function ($query) use ($selectedLocationId) {
-            $query->where('slots.booking_location_id', $selectedLocationId);
-        })
-        ->groupBy('hour')
-        ->orderBy('hour')
-        ->get();
+            ->join('slots', 'slots.id', '=', 'bookings.slot_id')
+            ->whereBetween('slots.date', [$startDate->toDateString(), $endDate->toDateString()])
+            ->when($selectedLocationId, function ($query) use ($selectedLocationId) {
+                $query->where('slots.booking_location_id', $selectedLocationId);
+            })
+            ->groupBy('hour')
+            ->orderBy('hour')
+            ->get();
 
         return view('admin.dashboard', compact(
             'totalUsers',
@@ -126,7 +134,9 @@ class AdminController extends Controller
             'selectedLocationId',
             'startDate',
             'endDate',
-            'period'
+            'period',
+            'registrationCounts',
+            'totalRegistrations'
         ));
     }
 }

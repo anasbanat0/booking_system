@@ -38,7 +38,30 @@
         ],
     ];
 
+    $registrationLocations = \App\Models\BookingLocation::query()
+        ->whereIn('slug', ['gaza', 'khan-younis'])
+        ->when(! Auth::user()?->canManageAllBranches(), fn ($query) => $query->whereKey(Auth::user()?->booking_location_id))
+        ->orderByRaw("CASE WHEN slug = 'gaza' THEN 0 ELSE 1 END")
+        ->get();
+
+    foreach ($registrationLocations as $registrationLocation) {
+        $adminLinks[] = [
+            'label' => $registrationLocation->slug === 'gaza' ? 'Gaza Registrations' : 'Khan Younis Registrations',
+            'route' => 'admin.hub-registrations.index',
+            'parameters' => ['location' => $registrationLocation],
+            'active' => request()->routeIs('admin.hub-registrations.*') && request()->route('location')?->is($registrationLocation),
+            'icon' => 'M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8Zm0 2c-4.42 0-8 2.24-8 5v2h16v-2c0-2.76-3.58-5-8-5Zm7-7V4h-2v3h-3v2h3v3h2V9h3V7h-3Z',
+        ];
+    }
+
     if (Auth::user()?->canManageAllBranches()) {
+        $adminLinks[] = [
+            'label' => 'Registration Forms',
+            'route' => 'admin.hub-registration-forms.index',
+            'active' => request()->routeIs('admin.hub-registration-forms.*'),
+            'icon' => 'M5 3a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V8l-5-5H5Zm9 2 5 5h-5V5ZM7 13h10v2H7v-2Zm0 4h7v2H7v-2Z',
+        ];
+
         $adminLinks[] = [
             'label' => 'Homepage',
             'route' => 'admin.content.index',
@@ -88,7 +111,7 @@
 
         <nav class="space-y-1">
             @foreach($adminLinks as $link)
-                <a href="{{ route($link['route']) }}"
+                <a href="{{ route($link['route'], $link['parameters'] ?? []) }}"
                    class="group flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-semibold transition {{ $link['active'] ? 'bg-slate-950 text-white shadow-sm' : 'text-slate-600 hover:bg-slate-100 hover:text-slate-950' }}">
                     <svg class="h-5 w-5 {{ $link['active'] ? 'text-white' : 'text-slate-400 group-hover:text-slate-700' }}"
                          viewBox="0 0 24 24"
@@ -122,7 +145,7 @@
 
     <nav class="grid grid-cols-2 gap-2">
         @foreach($adminLinks as $link)
-            <a href="{{ route($link['route']) }}"
+            <a href="{{ route($link['route'], $link['parameters'] ?? []) }}"
                class="flex items-center justify-center gap-2 rounded-md px-3 py-2 text-center text-sm font-semibold {{ $link['active'] ? 'bg-slate-950 text-white' : 'bg-slate-100 text-slate-700' }}">
                 <svg class="h-4 w-4"
                      viewBox="0 0 24 24"

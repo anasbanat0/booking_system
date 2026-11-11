@@ -3,6 +3,8 @@
 use App\Http\Controllers\AdminActivityLogController;
 use App\Http\Controllers\AdminBookingController;
 use App\Http\Controllers\AdminController;
+use App\Http\Controllers\AdminHubRegistrationController;
+use App\Http\Controllers\AdminHubRegistrationFormController;
 use App\Http\Controllers\AdminManageUserController;
 use App\Http\Controllers\AdminNotificationController;
 use App\Http\Controllers\AdminSiteContentController;
@@ -10,6 +12,7 @@ use App\Http\Controllers\AdminSlotSettingsController;
 use App\Http\Controllers\AdminUserCalendarController;
 use App\Http\Controllers\BookingController;
 use App\Http\Controllers\CalendarController;
+use App\Http\Controllers\HubRegistrationController;
 use App\Http\Controllers\ProfileController;
 use App\Models\BookingLocation;
 use App\Models\SiteContent;
@@ -19,6 +22,12 @@ use Illuminate\Support\Facades\Route;
 Route::get('/', function () {
     return view('welcome', HomepageContent::payload());
 });
+
+Route::get('/register/{location:slug}', [HubRegistrationController::class, 'show'])
+    ->name('hub-registration.show');
+Route::post('/register/{location:slug}', [HubRegistrationController::class, 'store'])
+    ->middleware('throttle:10,1')
+    ->name('hub-registration.store');
 
 Route::redirect('/hubs/khanyounis', '/login/khan-younis');
 Route::redirect('/hubs/khan-younes', '/login/khan-younis');
@@ -129,6 +138,19 @@ HTML;
 
 Route::middleware(['auth', 'admin'])->group(function () {
     Route::get('/admin/dashboard', [AdminController::class, 'index'])->name('admin.dashboard');
+
+    Route::get('/admin/registrations/{location:slug}', [AdminHubRegistrationController::class, 'index'])
+        ->name('admin.hub-registrations.index');
+    Route::get('/admin/registrations/{location:slug}/export', [AdminHubRegistrationController::class, 'export'])
+        ->name('admin.hub-registrations.export');
+    Route::get('/admin/registrations/{location:slug}/files/{registrationFileId}', [AdminHubRegistrationController::class, 'downloadFile'])
+        ->name('admin.hub-registrations.files.download');
+    Route::get('/admin/registrations/{location:slug}/{registration}', [AdminHubRegistrationController::class, 'show'])
+        ->name('admin.hub-registrations.show');
+    Route::get('/admin/registration-forms', [AdminHubRegistrationFormController::class, 'index'])
+        ->name('admin.hub-registration-forms.index');
+    Route::patch('/admin/registration-forms/{location:slug}', [AdminHubRegistrationFormController::class, 'update'])
+        ->name('admin.hub-registration-forms.update');
 
     Route::get('/admin/bookings', [AdminBookingController::class, 'index'])
         ->name('admin.bookings.index');

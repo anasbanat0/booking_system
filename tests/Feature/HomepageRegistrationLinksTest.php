@@ -12,7 +12,7 @@ class HomepageRegistrationLinksTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_homepage_shows_the_default_registration_link_for_each_hub(): void
+    public function test_homepage_shows_internal_registration_link_for_each_hub(): void
     {
         $gaza = BookingLocation::query()->where('slug', 'gaza')->firstOrFail();
         SiteContent::updateOrCreate(
@@ -23,8 +23,10 @@ class HomepageRegistrationLinksTest extends TestCase
         $response = $this->get('/');
 
         $response->assertOk()
-            ->assertSee('https://forms.gle/GgCcdxxgnzUMq8917', false)
-            ->assertSee('https://forms.gle/SkBLXMDVkS8uNqyy7', false)
+            ->assertSee(route('hub-registration.show', $gaza), false)
+            ->assertSee(route('hub-registration.show', BookingLocation::where('slug', 'khan-younis')->firstOrFail()), false)
+            ->assertDontSee('forms.gle', false)
+            ->assertDontSee('docs.google.com/forms', false)
             ->assertSee('Register')
             ->assertDontSee('Register for '.$gaza->name.' Hub');
     }
@@ -37,35 +39,13 @@ class HomepageRegistrationLinksTest extends TestCase
         $response = $this->actingAs($admin)->patch(route('admin.content.update'), [
             'content' => [
                 'hub_'.$gaza->id.'_registration_button_label' => 'Apply for Gaza',
-                'hub_'.$gaza->id.'_registration_url' => 'https://forms.gle/custom-gaza-form',
             ],
         ]);
 
         $response->assertRedirect();
-        $this->assertSame(
-            'https://forms.gle/custom-gaza-form',
-            SiteContent::getValue('hub_'.$gaza->id.'_registration_url')
-        );
-
         $this->get('/')
             ->assertOk()
             ->assertSee('Apply for Gaza')
-            ->assertSee('https://forms.gle/custom-gaza-form', false);
-    }
-
-    public function test_admin_cannot_save_an_invalid_registration_url(): void
-    {
-        $admin = User::factory()->create(['role' => 'admin']);
-        $gaza = BookingLocation::query()->where('slug', 'gaza')->firstOrFail();
-
-        $this->actingAs($admin)
-            ->from(route('admin.content.index'))
-            ->patch(route('admin.content.update'), [
-                'content' => [
-                    'hub_'.$gaza->id.'_registration_url' => 'not-a-url',
-                ],
-            ])
-            ->assertRedirect(route('admin.content.index'))
-            ->assertSessionHasErrors('content.hub_'.$gaza->id.'_registration_url');
+            ->assertSee(route('hub-registration.show', $gaza), false);
     }
 }

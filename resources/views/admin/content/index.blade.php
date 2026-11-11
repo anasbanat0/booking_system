@@ -192,7 +192,7 @@
                         <div class="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
                             <div>
                                 <h3 class="text-sm font-extrabold text-slate-950">Student registration forms</h3>
-                                <p class="mt-1 text-sm text-slate-500">These buttons open the branch registration forms in a new tab.</p>
+                                <p class="mt-1 text-sm text-slate-500">These buttons open the website registration forms. Form fields and page content have their own editor.</p>
                             </div>
                         </div>
 
@@ -200,12 +200,6 @@
                             @foreach($locations as $location)
                                 @php
                                     $labelKey = 'hub_' . $location->id . '_registration_button_label';
-                                    $urlKey = 'hub_' . $location->id . '_registration_url';
-                                    $defaultRegistrationUrl = match ($location->slug) {
-                                        'gaza' => 'https://forms.gle/GgCcdxxgnzUMq8917',
-                                        'khan-younis' => 'https://forms.gle/SkBLXMDVkS8uNqyy7',
-                                        default => '',
-                                    };
                                     $registrationLabel = $contents[$labelKey]->value ?? 'Register';
                                     if ($registrationLabel === 'Register for ' . $location->name . ' Hub') {
                                         $registrationLabel = 'Register';
@@ -226,13 +220,10 @@
                                                class="mt-1 block w-full rounded-md border-slate-300 text-sm shadow-sm focus:border-blue-500 focus:ring-blue-500">
                                     </label>
 
-                                    <label class="mt-3 block">
-                                        <span class="text-sm font-semibold text-slate-700">Google Form URL</span>
-                                        <input type="url" name="content[{{ $urlKey }}]"
-                                               value="{{ old('content.' . $urlKey, $contents[$urlKey]->value ?? $defaultRegistrationUrl) }}"
-                                               placeholder="https://forms.gle/..."
-                                               class="mt-1 block w-full rounded-md border-slate-300 text-sm shadow-sm focus:border-blue-500 focus:ring-blue-500">
-                                    </label>
+                                    <div class="mt-3 flex items-center justify-between gap-3 rounded-md bg-slate-50 px-3 py-2.5">
+                                        <span class="truncate text-xs font-semibold text-slate-500">{{ route('hub-registration.show', $location) }}</span>
+                                        <a href="{{ route('admin.hub-registration-forms.index', ['hub' => $location->slug]) }}" class="shrink-0 text-xs font-extrabold text-blue-700 hover:underline">Edit form</a>
+                                    </div>
                                 </div>
                             @endforeach
                         </div>

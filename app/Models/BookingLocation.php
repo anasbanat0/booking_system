@@ -27,4 +27,13 @@ class BookingLocation extends Model
         return $this->hasMany(Slot::class);
     }
 
+    public function registrationForm()
+    {
+        return $this->hasOne(HubRegistrationForm::class);
+    }
+
+    public function hubRegistrations()
+    {
+        return $this->hasMany(HubRegistration::class);
+    }
 }

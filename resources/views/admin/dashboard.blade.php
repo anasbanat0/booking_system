@@ -120,6 +120,23 @@
             </div>
         </div>
 
+        <section class="mt-6 overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
+            <div class="flex flex-col gap-2 border-b border-slate-200 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
+                <div><h2 class="font-bold text-slate-950">Hub Registrations</h2><p class="mt-1 text-sm text-slate-500">Applications submitted during the selected dashboard range.</p></div>
+                <p class="text-sm font-bold text-slate-700">{{ number_format($totalRegistrations) }} total</p>
+            </div>
+            <div class="grid sm:grid-cols-2">
+                @forelse($registrationCounts as $registrationLocation)
+                    <a href="{{ route('admin.hub-registrations.index', ['location' => $registrationLocation, 'from' => $startDate->toDateString(), 'to' => $endDate->toDateString()]) }}" class="flex items-center justify-between gap-4 border-slate-200 px-5 py-5 hover:bg-slate-50 sm:[&:not(:last-child)]:border-r">
+                        <div><p class="font-bold text-slate-900">{{ $registrationLocation->name }} Hub</p><p class="mt-1 text-sm text-slate-500">View applications</p></div>
+                        <span class="text-3xl font-black text-emerald-700">{{ number_format($registrationLocation->registrations_count) }}</span>
+                    </a>
+                @empty
+                    <p class="px-5 py-6 text-sm text-slate-500">No registration branch is available.</p>
+                @endforelse
+            </div>
+        </section>
+
         <div class="mt-8 grid grid-cols-1 gap-6 xl:grid-cols-3">
             <section class="rounded-lg border border-slate-200 bg-white shadow-sm xl:col-span-2">
                 <div class="flex items-center justify-between border-b border-slate-200 px-5 py-4">

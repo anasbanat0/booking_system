@@ -102,25 +102,11 @@ class HomepageContent
                 ->map(fn (BookingLocation $registrationLocation) => [
                     'location' => $registrationLocation,
                     'label' => self::registrationLabel($registrationLocation),
-                    'url' => self::value(
-                        'registration_url',
-                        self::defaultRegistrationUrl($registrationLocation),
-                        $registrationLocation
-                    ),
+                    'url' => route('hub-registration.show', $registrationLocation),
                 ])
-                ->filter(fn (array $link) => $link['url'] !== '')
                 ->values(),
             'selectedLocation' => $location,
         ];
-    }
-
-    private static function defaultRegistrationUrl(BookingLocation $location): string
-    {
-        return match ($location->slug) {
-            'gaza' => 'https://forms.gle/GgCcdxxgnzUMq8917',
-            'khan-younis' => 'https://forms.gle/SkBLXMDVkS8uNqyy7',
-            default => '',
-        };
     }
 
     private static function registrationLabel(BookingLocation $location): string

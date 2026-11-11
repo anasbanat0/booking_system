@@ -69,7 +69,6 @@ class AdminSiteContentController extends Controller
 
         foreach (BookingLocation::query()->pluck('id') as $locationId) {
             $rules['content.hub_'.$locationId.'_registration_button_label'] = ['nullable', 'string', 'max:100'];
-            $rules['content.hub_'.$locationId.'_registration_url'] = ['nullable', 'url:http,https', 'max:2048'];
         }
 
         $validated = $request->validate($rules);
