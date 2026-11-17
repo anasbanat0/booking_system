@@ -28,6 +28,8 @@ Route::get('/register/{location:slug}', [HubRegistrationController::class, 'show
 Route::post('/register/{location:slug}', [HubRegistrationController::class, 'store'])
     ->middleware('throttle:10,1')
     ->name('hub-registration.store');
+Route::get('/register/{location:slug}/instructions-file', [HubRegistrationController::class, 'instructionsFile'])
+    ->name('hub-registration.instructions-file');
 
 Route::redirect('/hubs/khanyounis', '/login/khan-younis');
 Route::redirect('/hubs/khan-younes', '/login/khan-younis');
@@ -145,6 +147,12 @@ Route::middleware(['auth', 'admin'])->group(function () {
         ->name('admin.hub-registrations.export');
     Route::get('/admin/registrations/{location:slug}/files/{registrationFileId}', [AdminHubRegistrationController::class, 'downloadFile'])
         ->name('admin.hub-registrations.files.download');
+    Route::post('/admin/registrations/{location:slug}/accept-selected', [AdminHubRegistrationController::class, 'acceptSelected'])
+        ->name('admin.hub-registrations.accept-selected');
+    Route::post('/admin/registrations/{location:slug}/{registration}/accept', [AdminHubRegistrationController::class, 'accept'])
+        ->name('admin.hub-registrations.accept');
+    Route::post('/admin/registrations/{location:slug}/{registration}/reject', [AdminHubRegistrationController::class, 'reject'])
+        ->name('admin.hub-registrations.reject');
     Route::get('/admin/registrations/{location:slug}/{registration}', [AdminHubRegistrationController::class, 'show'])
         ->name('admin.hub-registrations.show');
     Route::get('/admin/registration-forms', [AdminHubRegistrationFormController::class, 'index'])

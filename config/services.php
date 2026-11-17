@@ -51,4 +51,9 @@ return [
         ],
     ],
 
+    'hub_groups' => [
+        'gaza' => env('GAZA_HUB_WHATSAPP_GROUP', 'https://chat.whatsapp.com/K7DLZDOYdhmH6j6PeuWc88'),
+        'khan-younis' => env('KHAN_YOUNIS_HUB_WHATSAPP_GROUP', 'https://chat.whatsapp.com/BgGLJZgGl2hKvVYM6ecslC'),
+    ],
+
 ];

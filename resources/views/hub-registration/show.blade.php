@@ -39,7 +39,7 @@
                         <p class="text-xs font-extrabold uppercase tracking-widest text-emerald-700">{{ $form->eyebrow }}</p>
                         <h1 class="mt-3 text-3xl font-black tracking-normal sm:text-4xl">{{ $form->title }}</h1>
                         @if($form->description)
-                            <p class="mt-4 max-w-4xl leading-7 text-slate-800">{{ $form->description }}</p>
+                            <div class="hub-rich-text mt-4 max-w-4xl text-slate-800">{!! \App\Support\SafeRichText::render($form->description) !!}</div>
                         @endif
                     </div>
 
@@ -104,7 +104,16 @@
 
                 <aside class="border border-slate-200 bg-white p-6 shadow-sm lg:sticky lg:top-6 xl:p-7">
                     <p class="text-xs font-extrabold uppercase tracking-widest text-emerald-700">Before you submit</p>
-                    <div class="mt-4 whitespace-pre-line text-base font-medium leading-8 text-slate-800">{{ $form->instructions }}</div>
+                    <div class="hub-rich-text mt-4 text-base font-medium text-slate-800">{!! \App\Support\SafeRichText::render($form->instructions) !!}</div>
+                    @if($form->instructions_file_path)
+                        <div class="mt-5 border-t border-slate-200 pt-5">
+                            <p class="text-sm font-extrabold text-slate-900">Hub instructions guide</p>
+                            <div class="mt-3 flex flex-wrap gap-2">
+                                <a href="{{ route('hub-registration.instructions-file', $location) }}" target="_blank" rel="noopener" class="inline-flex h-10 items-center justify-center rounded-md bg-emerald-700 px-4 text-sm font-extrabold text-white hover:bg-emerald-800">Open PDF</a>
+                                <a href="{{ route('hub-registration.instructions-file', [$location, 'download' => 1]) }}" class="inline-flex h-10 items-center justify-center rounded-md border border-slate-300 bg-white px-4 text-sm font-extrabold text-slate-800 hover:bg-slate-50">Download</a>
+                            </div>
+                        </div>
+                    @endif
                     <div class="mt-5 border-t border-slate-200 pt-5">
                         <p class="text-sm font-extrabold text-slate-900">{{ $location->name }} Hub</p>
                         <p class="mt-1 text-sm font-medium leading-5 text-slate-700">Fields marked with * are required.</p>

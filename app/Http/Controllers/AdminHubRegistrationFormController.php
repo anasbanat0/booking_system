@@ -5,8 +5,10 @@ namespace App\Http\Controllers;
 use App\Models\BookingLocation;
 use App\Models\HubRegistrationField;
 use App\Models\HubRegistrationForm;
+use App\Support\SafeRichText;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 
@@ -64,14 +66,16 @@ class AdminHubRegistrationFormController extends Controller
             'new_field.help_text' => ['nullable', 'string', 'max:500'],
             'new_field.options' => ['nullable', 'string', 'max:3000'],
             'new_field.is_required' => ['nullable', 'boolean'],
+            'instructions_pdf' => ['nullable', 'file', 'mimes:pdf', 'max:20480'],
+            'remove_instructions_pdf' => ['nullable', 'boolean'],
         ]);
 
         DB::transaction(function () use ($request, $form, $validated) {
             $form->update([
                 'eyebrow' => $validated['eyebrow'],
                 'title' => $validated['title'],
-                'description' => $validated['description'] ?? null,
-                'instructions' => $validated['instructions'] ?? null,
+                'description' => SafeRichText::sanitize($validated['description'] ?? null),
+                'instructions' => SafeRichText::sanitize($validated['instructions'] ?? null),
                 'submit_button' => $validated['submit_button'],
                 'success_title' => $validated['success_title'],
                 'success_message' => $validated['success_message'],
@@ -115,7 +119,46 @@ class AdminHubRegistrationFormController extends Controller
             }
         });
 
-        return back()->with('success', $location->name.' registration form updated successfully.');
+        $oldInstructionsPath = $form->instructions_file_path;
+
+        if ($request->hasFile('instructions_pdf')) {
+            $file = $request->file('instructions_pdf');
+            $path = $file->storeAs(
+                'hub-registration-instructions/'.$location->slug,
+                Str::uuid().'.pdf',
+                'local'
+            );
+
+            try {
+                $form->update([
+                    'instructions_file_disk' => 'local',
+                    'instructions_file_path' => $path,
+                    'instructions_file_name' => $file->getClientOriginalName(),
+                    'instructions_file_mime' => $file->getMimeType() ?: 'application/pdf',
+                    'instructions_file_size' => $file->getSize(),
+                ]);
+            } catch (\Throwable $exception) {
+                Storage::disk('local')->delete($path);
+                throw $exception;
+            }
+
+            if ($oldInstructionsPath && $oldInstructionsPath !== $path) {
+                Storage::disk('local')->delete($oldInstructionsPath);
+            }
+        } elseif ($request->boolean('remove_instructions_pdf') && $oldInstructionsPath) {
+            $form->update([
+                'instructions_file_disk' => null,
+                'instructions_file_path' => null,
+                'instructions_file_name' => null,
+                'instructions_file_mime' => null,
+                'instructions_file_size' => null,
+            ]);
+            Storage::disk('local')->delete($oldInstructionsPath);
+        }
+
+        return redirect()
+            ->route('admin.hub-registration-forms.index', ['hub' => $location->slug])
+            ->with('success', $location->name.' registration form updated successfully.');
     }
 
     private function options(string $value): ?array

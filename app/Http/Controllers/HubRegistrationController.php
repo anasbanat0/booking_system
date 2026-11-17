@@ -11,6 +11,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
+use Symfony\Component\HttpFoundation\HeaderUtils;
 
 class HubRegistrationController extends Controller
 {
@@ -117,6 +118,36 @@ class HubRegistrationController extends Controller
                 'title' => $form->success_title,
                 'message' => $form->success_message,
             ]);
+    }
+
+    public function instructionsFile(Request $request, BookingLocation $location)
+    {
+        abort_unless($location->is_active, 404);
+        $form = $this->formFor($location);
+        abort_unless($form->instructions_file_path && $form->instructions_file_disk, 404);
+        $disk = Storage::disk($form->instructions_file_disk);
+        abort_unless($disk->exists($form->instructions_file_path), 404);
+        $stream = $disk->readStream($form->instructions_file_path);
+        abort_unless(is_resource($stream), 404);
+        $filename = $form->instructions_file_name ?: $location->slug.'-instructions.pdf';
+        $disposition = HeaderUtils::makeDisposition(
+            $request->boolean('download') ? HeaderUtils::DISPOSITION_ATTACHMENT : HeaderUtils::DISPOSITION_INLINE,
+            $filename,
+            str_replace('%', '', Str::ascii($filename)) ?: 'instructions.pdf'
+        );
+
+        return response()->stream(function () use ($stream) {
+            try {
+                fpassthru($stream);
+            } finally {
+                fclose($stream);
+            }
+        }, 200, array_filter([
+            'Content-Type' => $form->instructions_file_mime ?: 'application/pdf',
+            'Content-Length' => $form->instructions_file_size ? (string) $form->instructions_file_size : null,
+            'Content-Disposition' => $disposition,
+            'X-Content-Type-Options' => 'nosniff',
+        ]));
     }
 
     private function formFor(BookingLocation $location): HubRegistrationForm

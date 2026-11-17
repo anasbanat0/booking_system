@@ -7,6 +7,7 @@ use App\Jobs\SendPasswordSetupLink;
 use App\Models\ActivityLog;
 use App\Models\BookingLocation;
 use App\Models\User;
+use App\Support\HubGroupLinks;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
@@ -114,7 +115,13 @@ class AdminManageUserController extends Controller
                 return $deletedUser->fresh();
             });
 
-            $this->queuePasswordSetupLink($user->id, 0, true);
+            $this->queuePasswordSetupLink(
+                $user->id,
+                0,
+                true,
+                $user->role === 'student' ? HubGroupLinks::forLocationId($branchId) : null,
+                $user->managedLocation?->name,
+            );
             ActivityLog::record('user_restored', 'Deleted user restored', $user->name.' was restored and updated from Add user manually.', [
                 'user_id' => $user->id,
                 'properties' => ['role' => $user->role],
@@ -132,7 +139,13 @@ class AdminManageUserController extends Controller
             'password' => $validated['password'] ?? 'password',
         ]);
 
-        $this->queuePasswordSetupLink($user->id, 0, true);
+        $this->queuePasswordSetupLink(
+            $user->id,
+            0,
+            true,
+            $user->role === 'student' ? HubGroupLinks::forLocationId($branchId) : null,
+            $user->managedLocation?->name,
+        );
         ActivityLog::record('user_created', 'User created', $user->name.' was created from Manage Users.', [
             'user_id' => $user->id,
             'properties' => ['role' => $user->role],
@@ -405,9 +418,15 @@ class AdminManageUserController extends Controller
         return $branchId;
     }
 
-    private function queuePasswordSetupLink(int $userId, int $position, bool $sendAccountCreatedMessage = false): void
+    private function queuePasswordSetupLink(
+        int $userId,
+        int $position,
+        bool $sendAccountCreatedMessage = false,
+        ?string $whatsAppGroupUrl = null,
+        ?string $hubName = null,
+    ): void
     {
-        SendPasswordSetupLink::dispatch($userId, $sendAccountCreatedMessage)
+        SendPasswordSetupLink::dispatch($userId, $sendAccountCreatedMessage, $whatsAppGroupUrl, $hubName)
             ->delay(now()->addSeconds($position * 8));
     }
 }

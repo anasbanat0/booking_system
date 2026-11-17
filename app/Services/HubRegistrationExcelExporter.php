@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
 use OpenSpout\Common\Entity\Row;
+use OpenSpout\Common\Entity\Cell;
 use OpenSpout\Common\Entity\Style\Style;
 use OpenSpout\Writer\XLSX\Entity\SheetView;
 use OpenSpout\Writer\XLSX\Writer;
@@ -23,9 +24,9 @@ class HubRegistrationExcelExporter
         $sheet->setName('Registrations');
         $sheet->setSheetView((new SheetView)->setFreezeRow(2));
         $sheet->setColumnWidth(18, 1, 2);
-        $sheet->setColumnWidthForRange(24, 3, count($fields) + 3);
+        $sheet->setColumnWidthForRange(24, 3, count($fields) + 4);
 
-        $headers = ['Registration ID', 'Hub', ...$fields->pluck('label')->all(), 'Submitted At'];
+        $headers = ['Registration ID', 'Hub', 'Status', ...$fields->pluck('label')->all(), 'Submitted At'];
         $headerStyle = (new Style)
             ->setFontBold()
             ->setFontColor('FFFFFF')
@@ -34,17 +35,27 @@ class HubRegistrationExcelExporter
 
         $query->with('files')->orderBy('id')->chunk(200, function ($registrations) use ($writer, $fields, $location) {
             foreach ($registrations as $registration) {
-                $values = [(string) $registration->id, $location->name];
+                $cells = [
+                    Cell::fromValue((string) $registration->id),
+                    Cell::fromValue($location->name),
+                    Cell::fromValue(ucfirst($registration->status)),
+                ];
                 $files = $registration->files->keyBy('hub_registration_field_id');
 
                 foreach ($fields as $field) {
-                    $values[] = (string) ($field->type === 'file'
-                        ? ($files->get($field->id)?->original_name ?? '')
-                        : ($registration->answers[(string) $field->id] ?? ''));
+                    $file = $files->get($field->id);
+
+                    if ($field->type === 'file' && $file) {
+                        $url = route('admin.hub-registrations.files.download', [$location, $file]);
+                        $formula = '=HYPERLINK("'.str_replace('"', '""', $url).'","Open '.str_replace('"', '""', $file->original_name).'")';
+                        $cells[] = Cell::fromValue($formula);
+                    } else {
+                        $cells[] = Cell::fromValue((string) ($field->type === 'file' ? '' : ($registration->answers[(string) $field->id] ?? '')));
+                    }
                 }
 
-                $values[] = $registration->submitted_at?->format('Y-m-d H:i:s') ?? '';
-                $writer->addRow(Row::fromValues($values));
+                $cells[] = Cell::fromValue($registration->submitted_at?->format('Y-m-d H:i:s') ?? '');
+                $writer->addRow(new Row($cells));
             }
         });
 

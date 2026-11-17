@@ -4,6 +4,7 @@ namespace App\Jobs;
 
 use App\Models\ActivityLog;
 use App\Models\User;
+use App\Support\HubGroupLinks;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Support\Facades\Hash;
@@ -92,7 +93,12 @@ class ImportUsersCsvChunk implements ShouldQueue
                 continue;
             }
 
-            SendPasswordSetupLink::dispatch($user->id, true)
+            SendPasswordSetupLink::dispatch(
+                $user->id,
+                true,
+                $user->role === 'student' ? HubGroupLinks::forLocationId($user->booking_location_id) : null,
+                $user->managedLocation?->name,
+            )
                 ->delay(now()->addSeconds(($this->rowOffset + $index) * 8));
 
             ActivityLog::record('user_imported', 'User imported', $user->name.' was imported from CSV.', [

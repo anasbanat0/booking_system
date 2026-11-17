@@ -46,6 +46,52 @@
     }
 }
 
+@layer components {
+    .hub-rich-text {
+        line-height: 1.75;
+    }
+
+    .hub-rich-text > * + * {
+        margin-top: 0.75rem;
+    }
+
+    .hub-rich-text h2 {
+        color: #0f172a;
+        font-size: 1.15rem;
+        font-weight: 800;
+        line-height: 1.45;
+    }
+
+    .hub-rich-text h3 {
+        color: #0f172a;
+        font-size: 1rem;
+        font-weight: 800;
+    }
+
+    .hub-rich-text ul,
+    .hub-rich-text ol {
+        padding-left: 1.4rem;
+    }
+
+    .hub-rich-text ul {
+        list-style: disc;
+    }
+
+    .hub-rich-text ol {
+        list-style: decimal;
+    }
+
+    .hub-rich-text li + li {
+        margin-top: 0.3rem;
+    }
+
+    .hub-rich-editor:empty::before {
+        color: #94a3b8;
+        content: 'Enter content here...';
+        pointer-events: none;
+    }
+}
+
 @layer utilities {
     html.dark .bg-white,
     html.dark .bg-white\/95,

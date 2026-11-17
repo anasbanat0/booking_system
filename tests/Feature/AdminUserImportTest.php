@@ -152,7 +152,10 @@ class AdminUserImportTest extends TestCase
         $this->assertDatabaseHas('users', ['email' => 'first.student@example.com']);
         $this->assertDatabaseHas('users', ['email' => 'second.student@example.com']);
         Queue::assertPushed(SendPasswordSetupLink::class, 2);
-        Queue::assertPushed(SendPasswordSetupLink::class, fn ($job) => $job->sendAccountCreatedMessage);
+        Queue::assertPushed(SendPasswordSetupLink::class, fn ($job) =>
+            $job->sendAccountCreatedMessage
+            && $job->whatsAppGroupUrl === config('services.hub_groups.'.$location->slug)
+        );
     }
 
     public function test_csv_import_does_not_drop_new_emails_when_phone_values_are_duplicated_or_scientific(): void
@@ -254,6 +257,36 @@ class AdminUserImportTest extends TestCase
             'user_id' => $user->id,
             'type' => 'password_setup_link_accepted',
         ]);
+    }
+
+    public function test_manual_student_creation_includes_group_link_but_resend_does_not(): void
+    {
+        Queue::fake();
+        $admin = User::factory()->create(['role' => 'admin']);
+        $location = BookingLocation::where('slug', 'gaza')->firstOrFail();
+
+        $this->actingAs($admin)->post(route('admin.manage.users.store'), [
+            'name' => 'Manual Student',
+            'email' => 'manual.student@example.com',
+            'phone' => '+970599111222',
+            'role' => 'student',
+            'booking_location_id' => $location->id,
+            'password' => '',
+        ])->assertRedirect()->assertSessionHas('success');
+
+        $student = User::where('email', 'manual.student@example.com')->firstOrFail();
+        Queue::assertPushed(SendPasswordSetupLink::class, fn ($job) =>
+            $job->userId === $student->id
+            && $job->whatsAppGroupUrl === config('services.hub_groups.gaza')
+        );
+
+        Queue::fake();
+        $this->actingAs($admin)->post(route('admin.manage.users.password-link', $student))
+            ->assertRedirect()
+            ->assertSessionHas('success');
+        Queue::assertPushed(SendPasswordSetupLink::class, fn ($job) =>
+            $job->userId === $student->id && $job->whatsAppGroupUrl === null
+        );
     }
 
     public function test_manual_creation_restores_a_deleted_account_instead_of_crashing_on_unique_email(): void

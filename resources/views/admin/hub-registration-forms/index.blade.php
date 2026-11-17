@@ -26,7 +26,7 @@
             </nav>
 
             @if($selectedForm)
-                <form method="POST" action="{{ route('admin.hub-registration-forms.update', $selectedForm->location) }}" class="mt-6 space-y-6">
+                <form id="hub-registration-form-editor" method="POST" action="{{ route('admin.hub-registration-forms.update', $selectedForm->location) }}" enctype="multipart/form-data" class="mt-6 space-y-6">
                     @csrf
                     @method('PATCH')
                     <section class="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
@@ -37,8 +37,41 @@
                         <div class="mt-5 grid gap-4 md:grid-cols-2">
                             <label class="block"><span class="text-sm font-bold text-slate-700">Eyebrow</span><input name="eyebrow" value="{{ old('eyebrow', $selectedForm->eyebrow) }}" class="mt-1 block h-11 w-full rounded-md border-slate-300 text-sm"></label>
                             <label class="block"><span class="text-sm font-bold text-slate-700">Page title</span><input name="title" value="{{ old('title', $selectedForm->title) }}" class="mt-1 block h-11 w-full rounded-md border-slate-300 text-sm"></label>
-                            <label class="block md:col-span-2"><span class="text-sm font-bold text-slate-700">Description</span><textarea name="description" rows="3" class="mt-1 block w-full rounded-md border-slate-300 text-sm">{{ old('description', $selectedForm->description) }}</textarea></label>
-                            <label class="block md:col-span-2"><span class="text-sm font-bold text-slate-700">Instructions</span><textarea name="instructions" rows="4" class="mt-1 block w-full rounded-md border-slate-300 text-sm">{{ old('instructions', $selectedForm->instructions) }}</textarea></label>
+                            @foreach([
+                                ['name' => 'description', 'label' => 'Description', 'height' => 'min-h-32'],
+                                ['name' => 'instructions', 'label' => 'Instructions', 'height' => 'min-h-40'],
+                            ] as $richField)
+                                @php
+                                    $richValue = old($richField['name'], $selectedForm->{$richField['name']});
+                                    $editorId = 'registration-' . $richField['name'];
+                                @endphp
+                                <div class="block md:col-span-2">
+                                    <span class="text-sm font-bold text-slate-700">{{ $richField['label'] }}</span>
+                                    <input type="hidden" name="{{ $richField['name'] }}" value="{{ $richValue }}" data-rich-input="{{ $editorId }}">
+                                    <div class="mt-1 flex flex-wrap gap-1 rounded-t-md border border-b-0 border-slate-300 bg-slate-50 p-2" role="toolbar" aria-label="{{ $richField['label'] }} formatting">
+                                        <button type="button" data-rich-format="p" data-rich-target="{{ $editorId }}" class="h-8 min-w-9 rounded border border-slate-300 bg-white px-2 text-xs font-bold text-slate-700 hover:bg-slate-100" title="Paragraph">P</button>
+                                        <button type="button" data-rich-format="h2" data-rich-target="{{ $editorId }}" class="h-8 min-w-9 rounded border border-slate-300 bg-white px-2 text-xs font-bold text-slate-700 hover:bg-slate-100" title="Heading">H2</button>
+                                        <button type="button" data-rich-command="bold" data-rich-target="{{ $editorId }}" class="h-8 min-w-9 rounded border border-slate-300 bg-white px-2 text-sm font-black text-slate-900 hover:bg-slate-100" title="Bold">B</button>
+                                        <button type="button" data-rich-command="italic" data-rich-target="{{ $editorId }}" class="h-8 min-w-9 rounded border border-slate-300 bg-white px-2 text-sm font-bold italic text-slate-900 hover:bg-slate-100" title="Italic">I</button>
+                                        <button type="button" data-rich-command="insertUnorderedList" data-rich-target="{{ $editorId }}" class="h-8 rounded border border-slate-300 bg-white px-3 text-xs font-bold text-slate-700 hover:bg-slate-100" title="Bulleted list">&#8226; List</button>
+                                        <button type="button" data-rich-command="insertOrderedList" data-rich-target="{{ $editorId }}" class="h-8 rounded border border-slate-300 bg-white px-3 text-xs font-bold text-slate-700 hover:bg-slate-100" title="Numbered list">1. List</button>
+                                    </div>
+                                    <div id="{{ $editorId }}" contenteditable="true" role="textbox" aria-multiline="true" class="hub-rich-editor hub-rich-text {{ $richField['height'] }} rounded-b-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:border-emerald-600 focus:outline-none focus:ring-1 focus:ring-emerald-600">{!! \App\Support\SafeRichText::render($richValue) !!}</div>
+                                </div>
+                            @endforeach
+                            <div class="rounded-md border border-slate-200 bg-slate-50 p-4 md:col-span-2">
+                                <label class="block">
+                                    <span class="text-sm font-bold text-slate-700">Hub instructions PDF</span>
+                                    <span class="mt-1 block text-xs text-slate-500">Upload the guide shown to applicants for this hub. PDF only, maximum 20 MB.</span>
+                                    <input type="file" name="instructions_pdf" accept="application/pdf,.pdf" class="mt-3 block w-full rounded-md border border-slate-300 bg-white text-sm file:mr-4 file:border-0 file:bg-slate-900 file:px-4 file:py-2.5 file:text-sm file:font-bold file:text-white">
+                                </label>
+                                @if($selectedForm->instructions_file_path)
+                                    <div class="mt-3 flex flex-wrap items-center gap-4 text-sm">
+                                        <a href="{{ route('hub-registration.instructions-file', $selectedForm->location) }}" target="_blank" rel="noopener" class="font-bold text-blue-700 hover:underline">Open {{ $selectedForm->instructions_file_name }}</a>
+                                        <label class="flex items-center gap-2 font-bold text-rose-700"><input type="checkbox" name="remove_instructions_pdf" value="1" class="rounded border-slate-300 text-rose-600">Remove current PDF</label>
+                                    </div>
+                                @endif
+                            </div>
                             <label class="block"><span class="text-sm font-bold text-slate-700">Submit button</span><input name="submit_button" value="{{ old('submit_button', $selectedForm->submit_button) }}" class="mt-1 block h-11 w-full rounded-md border-slate-300 text-sm"></label>
                             <label class="block"><span class="text-sm font-bold text-slate-700">Success title</span><input name="success_title" value="{{ old('success_title', $selectedForm->success_title) }}" class="mt-1 block h-11 w-full rounded-md border-slate-300 text-sm"></label>
                             <label class="block md:col-span-2"><span class="text-sm font-bold text-slate-700">Success message</span><textarea name="success_message" rows="2" class="mt-1 block w-full rounded-md border-slate-300 text-sm">{{ old('success_message', $selectedForm->success_message) }}</textarea></label>
@@ -93,4 +126,31 @@
         </div>
     </main>
 </div>
+<script>
+document.querySelectorAll('[data-rich-command], [data-rich-format]').forEach(button => {
+    button.addEventListener('mousedown', event => event.preventDefault());
+    button.addEventListener('click', () => {
+        const editor = document.getElementById(button.dataset.richTarget);
+
+        if (!editor) return;
+
+        editor.focus();
+        document.execCommand(
+            button.dataset.richCommand ? button.dataset.richCommand : 'formatBlock',
+            false,
+            button.dataset.richFormat || null
+        );
+    });
+});
+
+document.querySelectorAll('.hub-rich-editor').forEach(editor => {
+    editor.addEventListener('focus', () => document.execCommand('defaultParagraphSeparator', false, 'p'), { once: true });
+});
+
+document.getElementById('hub-registration-form-editor')?.addEventListener('submit', () => {
+    document.querySelectorAll('[data-rich-input]').forEach(input => {
+        input.value = document.getElementById(input.dataset.richInput)?.innerHTML.trim() || '';
+    });
+});
+</script>
 @endsection

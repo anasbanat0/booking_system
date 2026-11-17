@@ -4,6 +4,7 @@ namespace App\Jobs;
 
 use App\Models\ActivityLog;
 use App\Models\User;
+use App\Notifications\HubAcceptancePasswordSetup;
 use App\Services\WhatsAppService;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
@@ -19,7 +20,12 @@ class SendPasswordSetupLink implements ShouldQueue
 
     public array $backoff = [60, 300, 900];
 
-    public function __construct(public int $userId, public bool $sendAccountCreatedMessage = false) {}
+    public function __construct(
+        public int $userId,
+        public bool $sendAccountCreatedMessage = false,
+        public ?string $whatsAppGroupUrl = null,
+        public ?string $hubName = null,
+    ) {}
 
     public function handle(): void
     {
@@ -33,7 +39,21 @@ class SendPasswordSetupLink implements ShouldQueue
             app(WhatsAppService::class)->sendAccountCreated($user);
         }
 
-        $status = Password::sendResetLink(['email' => $user->email]);
+        $status = Password::sendResetLink(
+            ['email' => $user->email],
+            $this->whatsAppGroupUrl
+                ? function (User $notifiable, string $token) {
+                    $notifiable->notify(new HubAcceptancePasswordSetup(
+                        $token,
+                        $this->whatsAppGroupUrl,
+                        $this->hubName,
+                    ));
+
+                    $url = route('password.reset', ['token' => $token, 'email' => $notifiable->email]);
+                    app(WhatsAppService::class)->sendPasswordSetupLink($notifiable, $url);
+                }
+                : null,
+        );
 
         if ($status === Password::RESET_THROTTLED) {
             Log::notice('Password setup link skipped because a recent link is still valid.', [

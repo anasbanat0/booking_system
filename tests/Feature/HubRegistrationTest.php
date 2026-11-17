@@ -2,14 +2,19 @@
 
 namespace Tests\Feature;
 
+use App\Jobs\SendPasswordSetupLink;
 use App\Models\BookingLocation;
 use App\Models\HubRegistration;
 use App\Models\HubRegistrationForm;
 use App\Models\User;
+use App\Notifications\HubAcceptancePasswordSetup;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\Queue;
+use Illuminate\Support\Facades\Notification;
 use Tests\TestCase;
+use ZipArchive;
 
 class HubRegistrationTest extends TestCase
 {
@@ -23,6 +28,10 @@ class HubRegistrationTest extends TestCase
         $this->get(route('hub-registration.show', $gaza))
             ->assertOk()
             ->assertSee('Gaza Hub Registration')
+            ->assertSee('Do you have a reliable internet connection')
+            ->assertSee('Do you have a regular electricity supply')
+            ->assertSee('Why would you like to use the Medical Hub?')
+            ->assertSee('Are you able to attend regularly')
             ->assertSee('Gaza City')
             ->assertSee('North Gaza')
             ->assertDontSee('Middle Governorates');
@@ -58,8 +67,24 @@ class HubRegistrationTest extends TestCase
             $registration->files->first(),
         ]));
 
-        $download->assertOk()->assertDownload('university-id.jpg');
+        $download->assertOk();
+        $this->assertStringContainsString('inline', (string) $download->headers->get('content-disposition'));
         $this->assertNotSame('', $download->streamedContent());
+
+        $attachment = $this->actingAs($admin)->get(route('admin.hub-registrations.files.download', [
+            $location,
+            $registration->files->first(),
+            'download' => 1,
+        ]));
+        $attachment->assertOk()->assertDownload('university-id.jpg');
+
+        $export = $this->actingAs($admin)->get(route('admin.hub-registrations.export', $location));
+        $zip = new ZipArchive;
+        $this->assertTrue($zip->open($export->getFile()->getPathname()) === true);
+        $sheetXml = $zip->getFromName('xl/worksheets/sheet1.xml');
+        $zip->close();
+        $this->assertStringContainsString('HYPERLINK', $sheetXml);
+        $this->assertStringContainsString('Open university-id.jpg', $sheetXml);
     }
 
     public function test_email_must_be_unique_inside_the_same_hub(): void
@@ -116,9 +141,12 @@ class HubRegistrationTest extends TestCase
 
     public function test_admin_can_edit_form_content_and_field_label(): void
     {
+        Storage::fake('local');
         $admin = User::factory()->create(['role' => 'admin']);
         $location = BookingLocation::where('slug', 'gaza')->firstOrFail();
         $form = HubRegistrationForm::with('fields')->where('booking_location_id', $location->id)->firstOrFail();
+        $descriptionInput = '<p onclick="alert(1)">Medical Hub study spaces.</p><p><strong class="location">📍Location:</strong> Gaza City, Lego Space Building, 4th Floor.</p><ol><li>Bring your university ID.</li><li>Use active contact details.</li></ol><script>alert(1)</script>';
+        $description = '<p>Medical Hub study spaces.</p><p><strong>📍Location:</strong> Gaza City, Lego Space Building, 4th Floor.</p><ol><li>Bring your university ID.</li><li>Use active contact details.</li></ol>';
         $fields = $form->fields->map(fn ($field) => [
             'id' => $field->id,
             'label' => $field->key === 'gender' ? 'Applicant gender' : $field->label,
@@ -134,19 +162,134 @@ class HubRegistrationTest extends TestCase
         $this->actingAs($admin)->patch(route('admin.hub-registration-forms.update', $location), [
             'eyebrow' => $form->eyebrow,
             'title' => 'Updated Gaza Application',
-            'description' => $form->description,
+            'description' => $descriptionInput,
             'instructions' => $form->instructions,
             'submit_button' => $form->submit_button,
             'success_title' => $form->success_title,
             'success_message' => $form->success_message,
             'is_active' => '1',
             'fields' => $fields,
-        ])->assertRedirect();
+            'instructions_pdf' => UploadedFile::fake()->createWithContent('gaza-guide.pdf', '%PDF-1.4 guide'),
+        ])->assertRedirect(route('admin.hub-registration-forms.index', ['hub' => $location->slug]))
+            ->assertSessionHasNoErrors();
+
+        $this->assertSame($description, $form->fresh()->description);
+        Storage::disk('local')->assertExists($form->fresh()->instructions_file_path);
 
         $this->get(route('hub-registration.show', $location))
             ->assertOk()
             ->assertSee('Updated Gaza Application')
+            ->assertSee('<strong>📍Location:</strong>', false)
+            ->assertSee('<ol><li>Bring your university ID.</li>', false)
+            ->assertDontSee('onclick=', false)
+            ->assertDontSee('alert(1)')
+            ->assertSee('Open PDF')
             ->assertSee('Applicant gender');
+
+        $guide = $this->get(route('hub-registration.instructions-file', $location));
+        $guide->assertOk();
+        $this->assertStringContainsString('inline', (string) $guide->headers->get('content-disposition'));
+        $this->assertSame('%PDF-1.4 guide', $guide->streamedContent());
+    }
+
+    public function test_admin_can_accept_and_reject_applications_for_the_correct_hub(): void
+    {
+        Queue::fake();
+        $admin = User::factory()->create(['role' => 'admin']);
+        $location = BookingLocation::where('slug', 'gaza')->firstOrFail();
+        $form = HubRegistrationForm::with('fields')->where('booking_location_id', $location->id)->firstOrFail();
+        $phoneField = $form->fields->firstWhere('key', 'whatsapp_phone');
+        $accepted = HubRegistration::create([
+            'booking_location_id' => $location->id,
+            'full_name_ar' => 'Accepted Arabic Name',
+            'full_name_en' => 'Accepted Student',
+            'email' => 'accepted@example.com',
+            'answers' => [(string) $phoneField->id => '+970599123456'],
+            'submitted_at' => now(),
+        ]);
+        $rejected = HubRegistration::create([
+            'booking_location_id' => $location->id,
+            'full_name_ar' => 'Rejected Arabic Name',
+            'full_name_en' => 'Rejected Student',
+            'email' => 'rejected@example.com',
+            'answers' => [],
+            'submitted_at' => now(),
+        ]);
+
+        $this->actingAs($admin)->post(route('admin.hub-registrations.accept', [$location, $accepted]))
+            ->assertRedirect()
+            ->assertSessionHas('success');
+
+        $student = User::where('email', 'accepted@example.com')->firstOrFail();
+        $this->assertSame('student', $student->role);
+        $this->assertSame($location->id, $student->booking_location_id);
+        $this->assertSame('+970599123456', $student->phone);
+        $this->assertDatabaseHas('hub_registrations', [
+            'id' => $accepted->id,
+            'status' => 'accepted',
+            'accepted_user_id' => $student->id,
+        ]);
+        Queue::assertPushed(SendPasswordSetupLink::class, function ($job) use ($student) {
+            return $job->userId === $student->id
+                && $job->whatsAppGroupUrl === 'https://chat.whatsapp.com/K7DLZDOYdhmH6j6PeuWc88'
+                && filled($job->hubName);
+        });
+
+        $this->actingAs($admin)->post(route('admin.hub-registrations.accept', [$location, $accepted]))->assertSessionHas('success');
+        Queue::assertPushed(SendPasswordSetupLink::class, 1);
+
+        $this->actingAs($admin)->post(route('admin.hub-registrations.reject', [$location, $rejected]))
+            ->assertRedirect()
+            ->assertSessionHas('success');
+        $this->assertDatabaseHas('hub_registrations', ['id' => $rejected->id, 'status' => 'rejected']);
+
+        $this->actingAs($admin)->get(route('admin.hub-registrations.index', [$location, 'status' => 'accepted']))
+            ->assertOk()
+            ->assertSee('Accepted Student')
+            ->assertSee('1 results');
+    }
+
+    public function test_admin_can_accept_multiple_selected_applications(): void
+    {
+        Queue::fake();
+        $admin = User::factory()->create(['role' => 'admin']);
+        $location = BookingLocation::where('slug', 'khan-younis')->firstOrFail();
+        $registrations = collect(['one', 'two'])->map(fn ($name) => HubRegistration::create([
+            'booking_location_id' => $location->id,
+            'full_name_ar' => $name,
+            'full_name_en' => ucfirst($name).' Student',
+            'email' => $name.'@example.com',
+            'answers' => [],
+            'submitted_at' => now(),
+        ]));
+
+        $this->actingAs($admin)->post(route('admin.hub-registrations.accept-selected', $location), [
+            'registration_ids' => $registrations->pluck('id')->all(),
+        ])->assertRedirect()->assertSessionHas('success');
+
+        $this->assertSame(2, HubRegistration::where('status', 'accepted')->count());
+        Queue::assertPushed(SendPasswordSetupLink::class, 2);
+        Queue::assertPushed(SendPasswordSetupLink::class, fn ($job) => $job->whatsAppGroupUrl === 'https://chat.whatsapp.com/BgGLJZgGl2hKvVYM6ecslC');
+    }
+
+    public function test_acceptance_password_email_contains_the_hub_group_but_regular_reset_does_not(): void
+    {
+        Notification::fake();
+        $user = User::factory()->create(['role' => 'student']);
+        $groupUrl = 'https://chat.whatsapp.com/K7DLZDOYdhmH6j6PeuWc88';
+
+        (new SendPasswordSetupLink($user->id, true, $groupUrl, 'Gaza'))->handle();
+
+        Notification::assertSentTo($user, HubAcceptancePasswordSetup::class, fn ($notification) =>
+            $notification->whatsAppGroupUrl === $groupUrl && $notification->hubName === 'Gaza'
+        );
+
+        $mailHtml = (string) (new HubAcceptancePasswordSetup('test-token', $groupUrl, 'Gaza'))
+            ->toMail($user)
+            ->render();
+        $this->assertStringContainsString('Set your password', $mailHtml);
+        $this->assertStringContainsString('Join WhatsApp group', $mailHtml);
+        $this->assertStringContainsString($groupUrl, $mailHtml);
     }
 
     private function payloadFor(HubRegistrationForm $form): array
