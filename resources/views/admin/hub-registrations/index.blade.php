@@ -37,9 +37,9 @@
                 <div class="flex items-center justify-between border-b border-slate-200 px-5 py-4">
                     <div class="flex flex-wrap items-center gap-3">
                         <h2 class="font-bold text-slate-950">Applications</h2>
-                        <form id="accept-selected-form" method="POST" action="{{ route('admin.hub-registrations.accept-selected', $location) }}" onsubmit="return confirm('Accept the selected applications and create their student accounts?')">
+                        <form id="accept-selected-form" method="POST" action="{{ route('admin.hub-registrations.accept-selected', $location) }}">
                             @csrf
-                            <button class="inline-flex h-9 items-center rounded-md bg-emerald-700 px-4 text-sm font-bold text-white hover:bg-emerald-800">Accept selected</button>
+                            <button type="button" data-registration-confirm data-form-id="accept-selected-form" data-requires-selection="true" data-title="Accept selected applications?" data-message="Student accounts will be created in {{ $location->name }} Hub and each accepted student will receive the password setup and WhatsApp group links." data-confirm-label="Accept selected" class="inline-flex h-9 items-center rounded-md bg-emerald-700 px-4 text-sm font-bold text-white hover:bg-emerald-800">Accept selected</button>
                         </form>
                     </div>
                     <span class="text-sm font-semibold text-slate-500">{{ number_format($registrations->total()) }} results</span>
@@ -74,10 +74,12 @@
                                     <td class="px-5 py-4"><div class="flex justify-end gap-2">
                                         <a href="{{ route('admin.hub-registrations.show', [$location, $registration]) }}" class="inline-flex h-9 items-center rounded-md border border-slate-300 px-3 text-sm font-bold text-slate-700 hover:bg-slate-100">View</a>
                                         @if($registration->status !== 'accepted')
-                                            <form method="POST" action="{{ route('admin.hub-registrations.accept', [$location, $registration]) }}" onsubmit="return confirm('Accept this application and create the student account?')">@csrf<button class="inline-flex h-9 items-center rounded-md bg-emerald-700 px-3 text-sm font-bold text-white hover:bg-emerald-800">Accept</button></form>
+                                            <form id="accept-registration-{{ $registration->id }}" method="POST" action="{{ route('admin.hub-registrations.accept', [$location, $registration]) }}">@csrf</form>
+                                            <button type="button" data-registration-confirm data-form-id="accept-registration-{{ $registration->id }}" data-title="Accept {{ $registration->full_name_en }}?" data-message="A student account will be created in {{ $location->name }} Hub and the password setup and WhatsApp group links will be queued by email." data-confirm-label="Accept application" class="inline-flex h-9 items-center rounded-md bg-emerald-700 px-3 text-sm font-bold text-white hover:bg-emerald-800">Accept</button>
                                         @endif
                                         @if($registration->status !== 'accepted' && $registration->status !== 'rejected')
-                                            <form method="POST" action="{{ route('admin.hub-registrations.reject', [$location, $registration]) }}" onsubmit="return confirm('Reject this application?')">@csrf<button class="inline-flex h-9 items-center rounded-md border border-rose-300 px-3 text-sm font-bold text-rose-700 hover:bg-rose-50">Reject</button></form>
+                                            <form id="reject-registration-{{ $registration->id }}" method="POST" action="{{ route('admin.hub-registrations.reject', [$location, $registration]) }}">@csrf</form>
+                                            <button type="button" data-registration-confirm data-form-id="reject-registration-{{ $registration->id }}" data-title="Reject {{ $registration->full_name_en }}?" data-message="The application will be marked as rejected and will no longer appear under Needs review. No student account will be created." data-confirm-label="Reject application" data-tone="danger" class="inline-flex h-9 items-center rounded-md border border-rose-300 px-3 text-sm font-bold text-rose-700 hover:bg-rose-50">Reject</button>
                                         @endif
                                     </div></td>
                                 </tr>
@@ -92,6 +94,7 @@
         </div>
     </main>
 </div>
+@include('admin.hub-registrations.confirm-modal')
 <script>
 document.getElementById('select-all-registrations')?.addEventListener('change', event => {
     document.querySelectorAll('.registration-checkbox').forEach(checkbox => checkbox.checked = event.target.checked);

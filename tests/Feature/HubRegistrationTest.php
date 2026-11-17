@@ -82,8 +82,12 @@ class HubRegistrationTest extends TestCase
         $zip = new ZipArchive;
         $this->assertTrue($zip->open($export->getFile()->getPathname()) === true);
         $sheetXml = $zip->getFromName('xl/worksheets/sheet1.xml');
+        $relationshipsXml = $zip->getFromName('xl/worksheets/_rels/sheet1.xml.rels');
         $zip->close();
-        $this->assertStringContainsString('HYPERLINK', $sheetXml);
+        $this->assertStringContainsString('<hyperlinks>', $sheetXml);
+        $this->assertStringContainsString('ref="K2"', $sheetXml);
+        $this->assertStringContainsString('/admin/registrations/gaza/files/', $relationshipsXml);
+        $this->assertStringContainsString('TargetMode="External"', $relationshipsXml);
         $this->assertStringContainsString('Open university-id.jpg', $sheetXml);
     }
 
@@ -113,7 +117,9 @@ class HubRegistrationTest extends TestCase
 
         $this->actingAs($admin)->get(route('admin.hub-registrations.index', [$location, 'search' => 'Test Applicant']))
             ->assertOk()
-            ->assertSee('Test Applicant');
+            ->assertSee('Test Applicant')
+            ->assertSee('Accept selected applications?')
+            ->assertDontSee("return confirm(", false);
 
         $this->actingAs($admin)->get(route('admin.hub-registrations.show', [$location, $registration]))
             ->assertOk()
